@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/ad.dart';
+import '../services/analytics_service.dart';
 
 class NativeAdPosterCard extends StatelessWidget {
   final Ad ad;
@@ -16,6 +17,13 @@ class NativeAdPosterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
+        AnalyticsService.instance.trackEvent('ad_click', {
+          'ad_id': ad.id,
+          'title': ad.title,
+          'placement': 'poster',
+          'destination_url': ad.link,
+          'timestamp': DateTime.now().toIso8601String(),
+        });
         final url = Uri.parse(ad.link);
         if (await canLaunchUrl(url)) {
           await launchUrl(url, mode: LaunchMode.externalApplication);

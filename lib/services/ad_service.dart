@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:startapp_sdk/startapp.dart';
+import 'package:reelriot/services/analytics_service.dart';
 
 class AdService extends ChangeNotifier {
   AdService._();
@@ -127,6 +128,13 @@ class AdService extends ChangeNotifier {
       },
       onAdClicked: () {
         debugPrint('Start.io Interstitial Ad Clicked');
+        AnalyticsService.instance.trackEvent('ad_click', {
+          'ad_id': 'startapp_interstitial',
+          'title': 'StartApp Interstitial',
+          'placement': 'interstitial',
+          'format': 'interstitial',
+          'timestamp': DateTime.now().toIso8601String(),
+        });
       },
       onAdHidden: () {
         debugPrint('Start.io Interstitial Ad hidden');
@@ -137,6 +145,13 @@ class AdService extends ChangeNotifier {
       },
       onAdImpression: () {
         debugPrint('Start.io Interstitial Ad Impression');
+        AnalyticsService.instance.trackEvent('ad_impression', {
+          'ad_id': 'startapp_interstitial',
+          'title': 'StartApp Interstitial',
+          'placement': 'interstitial',
+          'format': 'interstitial',
+          'timestamp': DateTime.now().toIso8601String(),
+        });
       },
     ).then((ad) {
       _interstitialAd = ad;

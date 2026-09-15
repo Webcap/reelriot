@@ -144,7 +144,7 @@ class DiscoverMoviesState extends State<DiscoverMovies>
                           (BuildContext context, int index, int pageViewIndex) {
                         final appDep = Provider.of<AppDependencyProvider>(context, listen: false);
                         final heroAds = appDep.initialAds.where((a) => a.matchesPlacement('hero')).toList();
-                        final hasAd = heroAds.isNotEmpty;
+                        final hasAd = appDep.enableHeroAds && heroAds.isNotEmpty;
                         
                         // Inject ad at Index 1
                         if (hasAd && index == 1) {
@@ -201,7 +201,7 @@ class DiscoverMoviesState extends State<DiscoverMovies>
                       },
                       itemCount: (() {
                         final appDep = Provider.of<AppDependencyProvider>(context, listen: false);
-                        final hasAd = appDep.initialAds.any((a) => a.matchesPlacement('hero'));
+                        final hasAd = appDep.enableHeroAds && appDep.initialAds.any((a) => a.matchesPlacement('hero'));
                         return moviesList!.length + (hasAd ? 1 : 0);
                       })(),
                     ),

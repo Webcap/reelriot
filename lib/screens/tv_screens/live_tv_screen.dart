@@ -13,7 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:reelriot/provider/app_dependency_provider.dart';
 import 'package:reelriot/provider/settings_provider.dart';
 import 'package:reelriot/services/ad_service.dart';
-import 'package:startapp_sdk/startapp.dart';
+import 'package:reelriot/widgets/banner_ad_widget.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -410,7 +410,7 @@ class ChannelListState extends State<ChannelList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _BannerWrapper(),
+        const BannerAdWidget(),
         if (showFeatured) FeaturedMatchCard(event: featuredEvent),
         Padding(
           padding: const EdgeInsets.only(bottom: 16, top: 8),
@@ -1255,67 +1255,5 @@ class _FilterChip extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _BannerWrapper extends StatefulWidget {
-  const _BannerWrapper();
-
-  @override
-  State<_BannerWrapper> createState() => _BannerWrapperState();
-}
-
-class _BannerWrapperState extends State<_BannerWrapper> {
-  StartAppBannerAd? _bannerAd;
-  bool _loading = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final remoteAdsEnabled =
-        Provider.of<AppDependencyProvider>(context).enableADS;
-    final adService = Provider.of<AdService>(context);
-
-    if (remoteAdsEnabled &&
-        _bannerAd == null &&
-        !_loading &&
-        adService.isEnabled) {
-      _loadAd(adService);
-    } else if ((!remoteAdsEnabled || !adService.isEnabled) && _bannerAd != null) {
-      setState(() {
-        _bannerAd = null;
-      });
-    }
-  }
-
-  Future<void> _loadAd(AdService adService) async {
-    _loading = true;
-    final ad = await adService.loadNewBannerAd();
-    if (mounted) {
-      setState(() {
-        _bannerAd = ad;
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final remoteAdsEnabled =
-        Provider.of<AppDependencyProvider>(context).enableADS;
-    final adService = Provider.of<AdService>(context);
-
-    if (remoteAdsEnabled && adService.isEnabled && _bannerAd != null) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: SizedBox(
-          height: 50,
-          child: Center(
-            child: StartAppBanner(_bannerAd!),
-          ),
-        ),
-      );
-    }
-    return const SizedBox.shrink();
   }
 }

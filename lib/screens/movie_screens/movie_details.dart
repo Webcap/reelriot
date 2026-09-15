@@ -168,7 +168,7 @@ class MovieDetailPageState extends State<MovieDetailPage>
           ),
 
           // ── Native Ultra Banner Ad ──────────────────────────────────
-          if (appDep.enableADS)
+          if (appDep.enableBannerAds)
             SliverToBoxAdapter(
               child: Builder(
                 builder: (context) {
