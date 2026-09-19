@@ -103,10 +103,11 @@ class AuthService {
     }
   }
 
-  /// Sign out the current user and clear all local session data.
-  Future<void> signOut() async {
-    debugPrint('[AuthService] 🗑️ Signing out...');
-    await _supabase.auth.signOut();
+  /// Sign out the current user and clear local session data.
+  /// Defaults to [SignOutScope.local] so only this device session is terminated.
+  Future<void> signOut({SignOutScope scope = SignOutScope.local}) async {
+    debugPrint('[AuthService] 🗑️ Signing out (scope: $scope)...');
+    await _supabase.auth.signOut(scope: scope);
   }
 
   /// Manually refresh the current session.

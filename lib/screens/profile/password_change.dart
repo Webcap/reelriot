@@ -165,6 +165,13 @@ class _PasswordChangeScreenState extends State<PasswordChangeScreen> {
 
       await _auth.updateUser(UserAttributes(password: newPassword));
 
+      // Revoke all other platform sessions on password change for security
+      try {
+        await _auth.signOut(scope: SignOutScope.others);
+      } catch (e) {
+        debugPrint('[PasswordChange] Failed signing out other sessions: $e');
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
