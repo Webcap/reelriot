@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:reelriot/utils/constant.dart';
 import 'package:reelriot/utils/constant.dart' as constants;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'package:reelriot/models/live_tv.dart';
 import 'package:reelriot/models/espn_scoreboard.dart';
@@ -320,14 +321,11 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool _enableGoogleSignIn = false;
-  bool get enableGoogleSignIn => getFlag<bool>(
-        'enable_google_signin', 
-        getFlag<bool>('enable_google_sign_in',
-            getFlag<bool>('google_signin', _enableGoogleSignIn)));
+  bool _enableGoogleSignIn = true;
+  bool get enableGoogleSignIn => true;
   set enableGoogleSignIn(bool value) {
-    _enableGoogleSignIn = value;
-    _prefs.setEnableGoogleSignIn(value);
+    _enableGoogleSignIn = true;
+    // Feature flag removed: Google Sign-In is permanently enabled across all platforms.
     notifyListeners();
   }
 
@@ -514,6 +512,10 @@ class AppDependencyProvider extends ChangeNotifier {
     _enableAnonymousSignIn = await _prefs.getEnableAnonymousSignIn();
     _enableGoogleSignIn = await _prefs.getEnableGoogleSignIn();
     _mixpanelToken = await _prefs.getMixpanelToken();
+    if (_mixpanelToken.isEmpty || _mixpanelToken == '14e47609af644939d32d2511505377ec') {
+      _mixpanelToken = dotenv.env['MIXPANEL_API_KEY'] ?? 'c8ff0b487c27b501b6524084dc0b83a9';
+      await _prefs.setMixpanelToken(_mixpanelToken);
+    }
     
     // Listen for auth transitions to toggle ads automatically for premium users
     try {

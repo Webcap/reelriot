@@ -107,11 +107,27 @@ class SignInProvider extends ChangeNotifier {
             _applySession(session);
           }
           
-          // Fetch fresh profile data (this will also update UID/provider/etc.)
+          // Fetch or provision profile data (ensures new Google/OAuth users are fully provisioned)
           try {
+            final exists = await checkuserExists();
+            if (!exists && _uid != null) {
+              await saveDatatoFirestore();
+              final supabase = Supabase.instance.client;
+              await supabase.from('bookmarks').upsert({
+                'user_id': _uid,
+                'movies': [],
+                'tv_shows': [],
+              });
+              final generatedUsername = await createRandomUsername();
+              await insertUsername(generatedUsername, _uid!);
+              await supabase.from('profiles').update({
+                'username': generatedUsername,
+                'first_run': true,
+              }).eq('id', _uid!);
+            }
             await getUserDataFromFirestore(session.user.id);
           } catch (e) {
-            debugPrint('[Auth] ⚠️ Could not fetch profile (offline?): $e');
+            debugPrint('[Auth] ⚠️ Could not setup or fetch profile: $e');
           }
           AnalyticsService.instance.identify(session.user.id);
         } else if (event == AuthChangeEvent.initialSession) {
@@ -246,6 +262,62 @@ class SignInProvider extends ChangeNotifier {
       _hasError = true;
       _errorCode = e.message;
       notifyListeners();
+    }
+  }
+
+  Future<void> linkGoogleAccount() async {
+    _hasError = false;
+    _errorCode = null;
+    try {
+      await _authService.linkGoogleAccount();
+      notifyListeners();
+    } on AuthException catch (e) {
+      _hasError = true;
+      _errorCode = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<List<UserIdentity>> getUserIdentities() async {
+    return await _authService.getUserIdentities();
+  }
+
+  Future<void> unlinkIdentity(UserIdentity identity) async {
+    _hasError = false;
+    _errorCode = null;
+    try {
+      await _authService.unlinkIdentity(identity);
+      notifyListeners();
+    } on AuthException catch (e) {
+      _hasError = true;
+      _errorCode = e.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Sign in with existing email/password and immediately link Google account.
+  Future<void> signInAndLinkGoogle({
+    required String email,
+    required String password,
+  }) async {
+    _hasError = false;
+    _errorCode = null;
+    try {
+      final res = await _authService.signInWithEmail(
+        email: email,
+        password: password,
+      );
+      if (res.session != null) {
+        _applySession(res.session!);
+        await _authService.linkGoogleAccount();
+      }
+    } on AuthException catch (e) {
+      _hasError = true;
+      _errorCode = e.message;
+      notifyListeners();
+      rethrow;
     }
   }
 

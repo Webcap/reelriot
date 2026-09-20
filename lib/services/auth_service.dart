@@ -115,4 +115,39 @@ class AuthService {
     final response = await _supabase.auth.refreshSession();
     return response.session;
   }
+
+  /// Link Google OAuth identity to the currently signed-in user.
+  Future<bool> linkGoogleAccount() async {
+    try {
+      debugPrint('[AuthService] 🔗 Linking Google account...');
+      return await _supabase.auth.linkIdentity(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? null : 'io.reelriot.app://login-callback/',
+      );
+    } catch (e) {
+      debugPrint('[AuthService] ❌ linkGoogleAccount failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Retrieve all authentication identities associated with the current user.
+  Future<List<UserIdentity>> getUserIdentities() async {
+    try {
+      return await _supabase.auth.getUserIdentities();
+    } catch (e) {
+      debugPrint('[AuthService] ⚠️ getUserIdentities error: $e');
+      return [];
+    }
+  }
+
+  /// Unlink an authentication identity from the current user.
+  Future<void> unlinkIdentity(UserIdentity identity) async {
+    try {
+      debugPrint('[AuthService] 🔗 Unlinking identity: ${identity.provider}...');
+      await _supabase.auth.unlinkIdentity(identity);
+    } catch (e) {
+      debugPrint('[AuthService] ❌ unlinkIdentity error: $e');
+      rethrow;
+    }
+  }
 }

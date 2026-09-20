@@ -3,6 +3,7 @@ import 'package:reelriot/provider/bookmarks_provider.dart';
 import 'package:reelriot/provider/recently_watched_provider.dart';
 import 'package:reelriot/provider/settings_provider.dart';
 import 'package:reelriot/screens/auth_screens/forgot_password.dart';
+import 'package:reelriot/provider/sign_in_provider.dart';
 import 'package:reelriot/utils/app_images.dart';
 import 'package:reelriot/utils/globlal_methods.dart';
 import 'package:reelriot/utils/routes/app_pages.dart';
@@ -12,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:reelriot/screens/home_screen/dash_screen.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
+import 'package:reelriot/widgets/link_account_sheet.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -22,7 +24,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   static const Color _bgColor = Color(0xFF030712);
   static const Color _surfaceColor = Color(0xFF0B0F14);
   static const Color _surfaceBorder = Color(0x14FFFFFF);
@@ -39,11 +41,102 @@ class _LoginScreenState extends State<LoginScreen> {
   final _auth = Supabase.instance.client.auth;
   GlobalMethods globalMethods = GlobalMethods();
   bool isLoading = false;
+  bool isGoogleLoading = false;
+  VoidCallback? _authListener;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sp = context.read<SignInProvider>();
+      if (sp.isSignedIn) {
+        Get.offAllNamed(Routes.dash);
+        return;
+      }
+      _authListener = () {
+        if (sp.isSignedIn && mounted) {
+          Get.offAllNamed(Routes.dash);
+        }
+      };
+      sp.addListener(_authListener!);
+    });
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_authListener != null) {
+      try {
+        context.read<SignInProvider>().removeListener(_authListener!);
+      } catch (_) {}
+    }
     passwordFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final sp = context.read<SignInProvider>();
+      if (sp.isSignedIn) {
+        Get.offAllNamed(Routes.dash);
+      } else {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted && !sp.isSignedIn) {
+            setState(() {
+              isGoogleLoading = false;
+            });
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    final sp = context.read<SignInProvider>();
+    setState(() {
+      isGoogleLoading = true;
+    });
+    try {
+      await sp.signInWithGoogle();
+      if (!mounted) return;
+      if (sp.hasError) {
+        final err = (sp.errorCode ?? '').toLowerCase();
+        if (err.contains('already') || err.contains('exists') || err.contains('registered')) {
+          LinkAccountBottomSheet.show(context, sp, email: emailAddress.isNotEmpty ? emailAddress : null);
+        } else {
+          GlobalMethods.showCustomScaffoldMessage(
+            SnackBar(
+              content: Text(
+                sp.errorCode ?? 'Google Sign-In failed',
+                style: kTextSmallBodyStyle,
+              ),
+            ),
+            context,
+          );
+        }
+        setState(() {
+          isGoogleLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        GlobalMethods.showCustomScaffoldMessage(
+          SnackBar(
+            content: Text(
+              'Google Sign-In failed: $e',
+              style: kTextSmallBodyStyle,
+            ),
+          ),
+          context,
+        );
+        setState(() {
+          isGoogleLoading = false;
+        });
+      }
+    }
   }
 
   void submitForm() async {
@@ -380,67 +473,180 @@ class _LoginScreenState extends State<LoginScreen> {
                                 obscureText: obscureText,
                               ),
                               const SizedBox(height: 22),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: isLoading ? null : submitForm,
-                                  style: ElevatedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(56),
-                                    backgroundColor: _primaryColor,
-                                    foregroundColor: Colors.white,
-                                    disabledBackgroundColor:
-                                        _primaryColor.withValues(alpha: 0.6),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(999),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: isLoading || isGoogleLoading ? null : submitForm,
+                                    style: ElevatedButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(56),
+                                      backgroundColor: _primaryColor,
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor:
+                                          _primaryColor.withValues(alpha: 0.6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      elevation: 0,
+                                      shadowColor: Colors.transparent,
                                     ),
-                                    elevation: 0,
-                                    shadowColor: Colors.transparent,
-                                  ),
-                                  child: isLoading
-                                      ? const SizedBox(
-                                          height: 22,
-                                          width: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.4,
-                                            color: Colors.white,
+                                    child: isLoading
+                                        ? const SizedBox(
+                                            height: 22,
+                                            width: 22,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.4,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Text(
+                                            tr("login"),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16,
+                                            ),
                                           ),
-                                        )
-                                      : Text(
-                                          tr("login"),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.12),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      child: Text(
+                                        'or',
+                                        style: TextStyle(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.64),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                isGoogleLoading
+                                    ? Container(
+                                        height: 56,
+                                        width: double.infinity,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                          color: Colors.white,
+                                        ),
+                                        child: const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                            Color>(
+                                                        Color(0xFF1F2937)),
+                                              ),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Connecting to Google...',
+                                              style: TextStyle(
+                                                color: Color(0xFF1F2937),
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : InkWell(
+                                        onTap: isLoading || isGoogleLoading
+                                            ? null
+                                            : _handleGoogleSignIn,
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                        child: Container(
+                                          height: 56,
+                                          width: double.infinity,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                            color: Colors.white,
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Color(0x1F000000),
+                                                blurRadius: 16,
+                                                offset: Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              SvgPicture.asset(
+                                                MovixIcon.google,
+                                                width: 20,
+                                                height: 20,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              const Text(
+                                                'Continue with Google',
+                                                style: TextStyle(
+                                                  color: Color(0xFF111827),
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: 0.2,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const ForgotPasswordScreen(),
                                       ),
-                                    );
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(52),
-                                    side:
-                                        const BorderSide(color: _surfaceBorder),
-                                    foregroundColor: _textPrimary,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(999),
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const ForgotPasswordScreen(),
+                                        ),
+                                      );
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      side:
+                                          const BorderSide(color: _surfaceBorder),
+                                      foregroundColor: _textPrimary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      backgroundColor:
+                                          Colors.white.withValues(alpha: 0.03),
                                     ),
-                                    backgroundColor:
-                                        Colors.white.withValues(alpha: 0.03),
+                                    child: Text(tr("forgot_password")),
                                   ),
-                                  child: Text(tr("forgot_password")),
                                 ),
-                              ),
                             ],
                           ),
                         ),        // closes Form

@@ -9,6 +9,7 @@ import 'package:reelriot/provider/settings_provider.dart';
 import 'package:reelriot/provider/sign_in_provider.dart';
 import 'package:reelriot/screens/profile/delete_account.dart';
 import 'package:reelriot/screens/profile/password_change.dart';
+import 'package:reelriot/utils/app_images.dart';
 import 'package:reelriot/utils/globlal_methods.dart';
 import 'package:reelriot/utils/theme/textStyle.dart';
 
@@ -82,6 +83,103 @@ class _ProfileEditState extends State<ProfileEdit> {
   String _initialEmail = '';
   int _initialProfileId = 0;
   int _selectedProfileId = 0;
+
+  List<UserIdentity> _identities = [];
+  bool _isLoadingIdentities = false;
+  bool _isLinkingGoogle = false;
+  bool _isUnlinkingGoogle = false;
+
+  Future<void> _fetchIdentities() async {
+    if (!mounted) return;
+    setState(() => _isLoadingIdentities = true);
+    try {
+      final sp = Provider.of<SignInProvider>(context, listen: false);
+      final identities = await sp.getUserIdentities();
+      if (mounted) {
+        setState(() {
+          _identities = identities;
+          _isLoadingIdentities = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingIdentities = false);
+    }
+  }
+
+  Future<void> _handleLinkGoogle() async {
+    if (_isLinkingGoogle) return;
+    setState(() => _isLinkingGoogle = true);
+    try {
+      final sp = Provider.of<SignInProvider>(context, listen: false);
+      await sp.linkGoogleAccount();
+      await _fetchIdentities();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google account linked successfully'),
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _globalMethods.authErrorHandle(e.toString(), context);
+      }
+    } finally {
+      if (mounted) setState(() => _isLinkingGoogle = false);
+    }
+  }
+
+  Future<void> _handleUnlinkGoogle(UserIdentity identity) async {
+    if (_isUnlinkingGoogle) return;
+    final sp = Provider.of<SignInProvider>(context, listen: false);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Unlink Google Account'),
+        content: const Text(
+          'Are you sure you want to unlink your Google account? You will need to log in with your email and password.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _Design.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Unlink'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isUnlinkingGoogle = true);
+    try {
+      await sp.unlinkIdentity(identity);
+      await _fetchIdentities();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google account unlinked'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _globalMethods.authErrorHandle(e.toString(), context);
+      }
+    } finally {
+      if (mounted) setState(() => _isUnlinkingGoogle = false);
+    }
+  }
 
   static const int _emailCooldownSeconds = 60;
   DateTime? _lastEmailSentTimestamp;
@@ -161,6 +259,7 @@ class _ProfileEditState extends State<ProfileEdit> {
     _email = fallbackEmail;
     _initialEmail = fallbackEmail;
     _emailController.text = fallbackEmail;
+    _fetchIdentities();
 
     try {
       final res =
@@ -612,6 +711,13 @@ class _ProfileEditState extends State<ProfileEdit> {
                                   textSec: textSec,
                                 ),
                                 const SizedBox(height: _Design.space5),
+                                _buildLinkedAccountsCard(
+                                  surface: surface,
+                                  border: border,
+                                  textPrim: textPrim,
+                                  textSec: textSec,
+                                ),
+                                const SizedBox(height: _Design.space5),
                                 _buildSecurityCard(
                                   surface: surface,
                                   border: border,
@@ -650,6 +756,16 @@ class _ProfileEditState extends State<ProfileEdit> {
 
                           // ─── Account Info Card ────────────────────────────────────
                           _buildAccountInfoCard(
+                            surface: surface,
+                            border: border,
+                            textPrim: textPrim,
+                            textSec: textSec,
+                          ),
+
+                          const SizedBox(height: _Design.space5),
+
+                          // ─── Linked Accounts Card ────────────────────────────────
+                          _buildLinkedAccountsCard(
                             surface: surface,
                             border: border,
                             textPrim: textPrim,
@@ -1077,6 +1193,153 @@ class _ProfileEditState extends State<ProfileEdit> {
         ),
         if (trailing != null) trailing,
       ],
+    );
+  }
+
+  Widget _buildLinkedAccountsCard({
+    required Color surface,
+    required Color border,
+    required Color textPrim,
+    required Color textSec,
+  }) {
+    final googleIdentity = _identities.cast<UserIdentity?>().firstWhere(
+      (id) => id?.provider == 'google',
+      orElse: () => null,
+    );
+    final isGoogleLinked = googleIdentity != null;
+    final googleEmail = googleIdentity?.identityData?['email'] as String?;
+
+    return Container(
+      padding: const EdgeInsets.all(_Design.space4),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(_Design.radiusMd),
+        border: Border.all(color: border),
+        boxShadow: const [_Design.shadowCard],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Linked Accounts',
+            style: TextStyle(
+              color: textPrim,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: _Design.space3),
+          Container(
+            padding: const EdgeInsets.all(_Design.space3),
+            decoration: BoxDecoration(
+              color: _Design.bgCardDark.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(_Design.radiusSm),
+              border: Border.all(color: border, width: 1),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Image.asset(
+                    AssetValues.googleLogo,
+                    width: 20,
+                    height: 20,
+                  ),
+                ),
+                const SizedBox(width: _Design.space3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Google',
+                        style: TextStyle(
+                          color: textPrim,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        isGoogleLinked
+                            ? (googleEmail ?? 'Connected')
+                            : 'Not linked',
+                        style: TextStyle(
+                          color: isGoogleLinked
+                              ? const Color(0xFF22C55E)
+                              : textSec,
+                          fontSize: 12,
+                          fontWeight: isGoogleLinked
+                              ? FontWeight.w500
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isLoadingIdentities || _isLinkingGoogle || _isUnlinkingGoogle)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: _Design.primary,
+                      strokeWidth: 2,
+                    ),
+                  )
+                else if (googleIdentity != null)
+                  OutlinedButton(
+                    onPressed: () => _handleUnlinkGoogle(googleIdentity),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: border),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Disconnect',
+                      style: TextStyle(
+                        color: textSec,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )
+                else
+                  ElevatedButton(
+                    onPressed: _handleLinkGoogle,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _Design.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Connect',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

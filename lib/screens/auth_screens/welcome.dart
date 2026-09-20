@@ -13,6 +13,7 @@ import 'package:reelriot/utils/theme/textStyle.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:reelriot/widgets/link_account_sheet.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,7 +25,7 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> {
+class _WelcomeScreenState extends State<WelcomeScreen> with WidgetsBindingObserver {
   static const Color _bgColor = Color(0xFF030712);
   static const Color _surfaceColor = Color(0xFF0B0F14);
   static const Color _surfaceBorder = Color(0x14FFFFFF);
@@ -35,6 +36,56 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   bool anonButtonVisible = true;
   bool googleButtonVisable = true;
+  VoidCallback? _authListener;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final sp = context.read<SignInProvider>();
+      if (sp.isSignedIn) {
+        Get.offAllNamed(Routes.dash);
+        return;
+      }
+      _authListener = () {
+        if (sp.isSignedIn && mounted) {
+          Get.offAllNamed(Routes.dash);
+        }
+      };
+      sp.addListener(_authListener!);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_authListener != null) {
+      try {
+        context.read<SignInProvider>().removeListener(_authListener!);
+      } catch (_) {}
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final sp = context.read<SignInProvider>();
+      if (sp.isSignedIn) {
+        Get.offAllNamed(Routes.dash);
+      } else {
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted && !sp.isSignedIn) {
+            setState(() {
+              googleButtonVisable = true;
+            });
+          }
+        });
+      }
+    }
+  }
 
   Widget _buildSurfaceButton({
     required Widget child,
@@ -201,73 +252,108 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         ),
                         child: Column(
                           children: [
-                            if (appDependencyProvider.enableGoogleSignIn) ...[
-                              googleButtonVisable
-                                  ? _buildSurfaceButton(
-                                      onTap: () async {
-                                        setState(() {
-                                          googleButtonVisable = false;
-                                        });
-                                        handleGoogleSignin();
-                                      },
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          SvgPicture.asset(
-                                            MovixIcon.google,
-                                            width: 18,
-                                            height: 18,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Text(
-                                            'Continue with Google',
-                                            style: TextStyle(
-                                              color: _textPrimary,
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
+                            googleButtonVisable
+                                ? _buildSurfaceButton(
+                                    onTap: () async {
+                                      handleGoogleSignin();
+                                    },
+                                    backgroundColor: Colors.white,
+                                    borderColor: Colors.white,
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x1F000000),
+                                        blurRadius: 16,
+                                        offset: Offset(0, 4),
                                       ),
-                                    )
-                                  : const Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 14),
-                                      child: CircularProgressIndicator(),
+                                    ],
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        SvgPicture.asset(
+                                          MovixIcon.google,
+                                          width: 20,
+                                          height: 20,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text(
+                                          'Continue with Google',
+                                          style: TextStyle(
+                                            color: Color(0xFF111827),
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                              const SizedBox(height: 18),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Divider(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.12),
+                                  )
+                                : Container(
+                                    height: 56,
+                                    width: double.infinity,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(999),
+                                      color: Colors.white,
+                                      border: Border.all(color: Colors.white),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Color(0xFF1F2937)),
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Text(
+                                          'Connecting to Google...',
+                                          style: TextStyle(
+                                            color: Color(0xFF1F2937),
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    child: Text(
-                                      'or',
-                                      style: TextStyle(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.64),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Divider(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.12),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  child: Text(
+                                    'or',
+                                    style: TextStyle(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.64),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Divider(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.12),
-                                    ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.12),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 18),
-                            ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
                             _buildSurfaceButton(
                               onTap: () {
                                 nextScreen(context, const LoginScreen());
@@ -398,60 +484,34 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 
-  Future handleGoogleSignin() async {
+  Future<void> handleGoogleSignin() async {
     final sp = context.read<SignInProvider>();
-    await sp.signInWithGoogle();
-    if (!mounted) return;
-    if (sp.hasError) {
-      openSnackbar(context, sp.errorCode ?? 'Error', Colors.red);
-      setState(() {
-        googleButtonVisable = true;
-      });
-    } else {
-      final exists = await sp.checkuserExists();
-      if (!mounted) return;
-      if (!exists) {
-        // New user — create their profile row.
-        await sp.saveDatatoFirestore();
-      }
-      // In both cases, fetch fresh profile data (username, firstRun, etc.)
-      await sp.getUserDataFromFirestore(sp.uid);
-      if (!mounted) return;
-      openSnackbar(
-        context,
-        "Alright, You're Good Buddy.",
-        Colors.green,
-      );
-      handleAfterSignIn();
-    }
-  }
-
-  void handleAfterSignIn() {
-    final sp = context.read<SignInProvider>();
-
-    Future.delayed(const Duration(milliseconds: 1000)).then((value) async {
-      if (sp.firstRun == false && sp.provider == "google") {
-        final supabase = Supabase.instance.client;
-        final uid = sp.uid;
-        if (uid != null) {
-          await supabase.from('bookmarks').upsert({
-            'user_id': uid,
-            'movies': [],
-            'tv_shows': [],
-          });
-
-          final username = await sp.createRandomUsername();
-          await sp.insertUsername(username, uid);
-          await supabase.from('profiles').update({
-            'username': username,
-            'first_run': true,
-          }).eq('id', uid);
-
-          sharedPrefsSingleton.setString('username', username);
-        }
-      }
-      if (!mounted) return;
-      Get.offAllNamed(Routes.dash);
+    setState(() {
+      googleButtonVisable = false;
     });
+    try {
+      await sp.signInWithGoogle();
+      if (!mounted) return;
+      if (sp.hasError) {
+        final err = (sp.errorCode ?? '').toLowerCase();
+        if (err.contains('already') || err.contains('exists') || err.contains('registered')) {
+          LinkAccountBottomSheet.show(context, sp);
+        } else {
+          openSnackbar(context, sp.errorCode ?? 'Google Sign-In failed', Colors.red);
+        }
+        setState(() {
+          googleButtonVisable = true;
+        });
+      }
+      // Successful initiation will launch browser OAuth, and on deep-link return
+      // the auth listener will navigate directly to Routes.dash.
+    } catch (e) {
+      if (mounted) {
+        openSnackbar(context, 'Google Sign-In failed: $e', Colors.red);
+        setState(() {
+          googleButtonVisable = true;
+        });
+      }
+    }
   }
 }
