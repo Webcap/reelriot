@@ -1,5 +1,6 @@
 package media.webcap.reelriot
 
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -18,6 +19,27 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     "release" -> {
                         CastProxyService.stop(this)
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "media.webcap.reelriot/screen_wake")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "enable" -> {
+                        runOnUiThread {
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            window.decorView.keepScreenOn = true
+                        }
+                        result.success(true)
+                    }
+                    "disable" -> {
+                        runOnUiThread {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            window.decorView.keepScreenOn = false
+                        }
                         result.success(true)
                     }
                     else -> result.notImplemented()

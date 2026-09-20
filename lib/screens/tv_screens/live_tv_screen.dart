@@ -17,7 +17,6 @@ import 'package:reelriot/widgets/banner_ad_widget.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 // Removed _streamedFallbackUrl as we are Supabase-only now.
 
@@ -608,7 +607,6 @@ class ChannelListState extends State<ChannelList> {
 
   Future<void> _openEvent(EspnListEvent ev) async {
     debugPrint('[LiveTV] Event tapped: "${ev.game.name}" (${ev.sport})');
-    WakelockPlus.enable();
     final cancelRequested = Completer<void>();
     showDialog(
       context: context,
@@ -690,8 +688,6 @@ class ChannelListState extends State<ChannelList> {
     } catch (e, st) {
       debugPrint('[LiveTV] Supabase lookup error: $e');
       debugPrint('[LiveTV] $st');
-    } finally {
-      WakelockPlus.disable();
     }
 
     if (!mounted) return;
