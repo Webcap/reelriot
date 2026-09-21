@@ -137,7 +137,7 @@ abstract class MovixIcon {
   static const String twitter = "assets/icons/twitter.png";
   static const String whatsApp = "assets/icons/whatsapp.png";
   static const String website = "assets/icons/website.png";
-  static const String google = "assets/icons/google.png";
+  static const String google = "assets/icons/google.svg";
   static const String apple = "assets/icons/apple.png";
   static const letsYouIn = "assets/Bold/Logout.svg"; // Fallback
   static const letsYouIn_Dark = "assets/Bold/Logout.svg"; // Fallback
