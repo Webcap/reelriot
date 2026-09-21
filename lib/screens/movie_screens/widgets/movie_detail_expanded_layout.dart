@@ -246,7 +246,7 @@ class MovieDetailExpandedLayout extends StatelessWidget {
                         ),
                       ),
                     MovieAbout(movie: movie, scrollable: false),
-                    if (appDep.enableADS)
+                    if (appDep.enableBannerAds)
                       Builder(
                         builder: (context) {
                           final bannerAds = appDep.initialAds

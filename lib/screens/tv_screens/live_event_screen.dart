@@ -13,6 +13,7 @@ import 'package:reelriot/provider/app_dependency_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:reelriot/services/wakelock_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // design.json tokens: cinematic, dark-first, primary red
@@ -102,7 +103,7 @@ class LiveEventScreen extends StatefulWidget {
   State<LiveEventScreen> createState() => _LiveEventScreenState();
 }
 
-class _LiveEventScreenState extends State<LiveEventScreen> {
+class _LiveEventScreenState extends State<LiveEventScreen> with WidgetsBindingObserver {
   CaffeinePlayerController? _controller;
   EspnScoreboardGame? _scoreGame;
   String? _currentUrl;
@@ -139,12 +140,21 @@ class _LiveEventScreenState extends State<LiveEventScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WakelockService.enable();
     _currentUrl = widget.videoUrl;
     _currentReferrer = widget.referrer;
     _currentUserAgent = widget.userAgent;
     _sources = widget.sources ?? [];
     if (_hasStream) _initPlayer();
     if (widget.event.sport?.toLowerCase() == 'nba') _loadNbaScore();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      WakelockService.enable();
+    }
   }
 
   Future<void> _loadNbaScore() async {
@@ -235,6 +245,8 @@ class _LiveEventScreenState extends State<LiveEventScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    WakelockService.disable();
     _controller?.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
@@ -471,6 +483,7 @@ class _LiveEventScreenState extends State<LiveEventScreen> {
         child: mkv.Video(
           controller: _controller!.videoController,
           controls: mkv.MaterialVideoControls,
+          wakelock: false,
         ),
       );
     }

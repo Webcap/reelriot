@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:reelriot/utils/constant.dart';
 import 'package:reelriot/utils/constant.dart' as constants;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'package:reelriot/models/live_tv.dart';
 import 'package:reelriot/models/espn_scoreboard.dart';
@@ -267,8 +269,24 @@ class AppDependencyProvider extends ChangeNotifier {
     return isSportHidden(sport, _hiddenSportsRows, league: league, title: title, game: game);
   }
 
+  /// Evaluates whether the active authenticated user has premium subscription status
+  bool get isPremium {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return false;
+      final appMeta = user.appMetadata;
+      final userMeta = user.userMetadata;
+      if (appMeta['is_premium'] == true) return true;
+      if (userMeta != null && userMeta['is_premium'] == true) return true;
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool _enableADS = true;
   bool get enableADS {
+    if (isPremium) return false;
     if (getFlag<bool>('simulate_ads', false)) return true;
     if (!_enableADS) return false;
     if (getFlag<bool>('ads_enabled', true) == false) return false;
@@ -279,9 +297,14 @@ class AppDependencyProvider extends ChangeNotifier {
   set enableADS(bool value) {
     if (_enableADS == value) return;
     _enableADS = value;
-    AdService.instance.updateEnabledStatus(value);
+    AdService.instance.updateEnabledStatus(enableADS);
     notifyListeners();
   }
+
+  /// Placement-specific ad toggles
+  bool get enableHeroAds => enableADS && getFlag<bool>('enable_hero_ads', true);
+  bool get enablePosterAds => enableADS && getFlag<bool>('enable_poster_ads', true);
+  bool get enableBannerAds => enableADS && getFlag<bool>('enable_banner_ads', true);
 
   bool _enableOTTADS = true;
   bool get enableOTTADS => enableADS && getFlag<bool>('ott_ads_enabled', _enableOTTADS);
@@ -298,14 +321,11 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool _enableGoogleSignIn = false;
-  bool get enableGoogleSignIn => getFlag<bool>(
-        'enable_google_signin', 
-        getFlag<bool>('enable_google_sign_in',
-            getFlag<bool>('google_signin', _enableGoogleSignIn)));
+  bool _enableGoogleSignIn = true;
+  bool get enableGoogleSignIn => true;
   set enableGoogleSignIn(bool value) {
-    _enableGoogleSignIn = value;
-    _prefs.setEnableGoogleSignIn(value);
+    _enableGoogleSignIn = true;
+    // Feature flag removed: Google Sign-In is permanently enabled across all platforms.
     notifyListeners();
   }
 
@@ -366,6 +386,7 @@ class AppDependencyProvider extends ChangeNotifier {
 
   List<Ad> _initialAds = [];
   List<Ad> get initialAds {
+    if (!enableADS) return [];
     final simulate = getFlag<bool>('simulate_ads', false);
     final isDev = kDebugMode || (FlavorConfig.instance.flavor == Flavor.dev);
 
@@ -491,10 +512,33 @@ class AppDependencyProvider extends ChangeNotifier {
     _enableAnonymousSignIn = await _prefs.getEnableAnonymousSignIn();
     _enableGoogleSignIn = await _prefs.getEnableGoogleSignIn();
     _mixpanelToken = await _prefs.getMixpanelToken();
+    if (_mixpanelToken.isEmpty || _mixpanelToken == '14e47609af644939d32d2511505377ec') {
+      _mixpanelToken = dotenv.env['MIXPANEL_API_KEY'] ?? 'c8ff0b487c27b501b6524084dc0b83a9';
+      await _prefs.setMixpanelToken(_mixpanelToken);
+    }
     
+    // Listen for auth transitions to toggle ads automatically for premium users
+    try {
+      _authSubscription?.cancel();
+      _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+        AdService.instance.updateEnabledStatus(enableADS);
+        notifyListeners();
+      });
+    } catch (e) {
+      debugPrint('Error subscribing to auth state change for ads: $e');
+    }
+
     // Fetch native ads in background
     fetchAds();
     
     notifyListeners();
+  }
+
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

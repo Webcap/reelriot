@@ -5,7 +5,7 @@ import 'package:reelriot/functions/video_utils.dart';
 import 'package:reelriot/services/analytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:reelriot/services/wakelock_service.dart';
 import 'package:reelriot/screens/player/widgets/glass_player_controls.dart';
 import 'package:reelriot/screens/player/widgets/cast_bottom_sheet.dart';
 
@@ -27,7 +27,7 @@ class LivePlayer extends StatefulWidget {
   State<LivePlayer> createState() => _LivePlayerState();
 }
 
-class _LivePlayerState extends State<LivePlayer> {
+class _LivePlayerState extends State<LivePlayer> with WidgetsBindingObserver {
   late CaffeinePlayerController _betterPlayerController;
 
   final GlobalKey _betterPlayerKey = GlobalKey();
@@ -37,6 +37,7 @@ class _LivePlayerState extends State<LivePlayer> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadStartTime = DateTime.now();
 
     AnalyticsService.instance.trackQoSEvent('Live Playback Attempt', {
@@ -60,11 +61,19 @@ class _LivePlayerState extends State<LivePlayer> {
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    WakelockPlus.enable();
+    WakelockService.enable();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      WakelockService.enable();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _betterPlayerController.dispose();
     
     // Restore orientations, system overlays, and disable wakelock
@@ -74,7 +83,7 @@ class _LivePlayerState extends State<LivePlayer> {
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    WakelockPlus.disable();
+    WakelockService.disable();
 
     super.dispose();
   }
@@ -118,6 +127,7 @@ class _LivePlayerState extends State<LivePlayer> {
             child: mkv.Video(
               controller: _betterPlayerController.videoController,
               controls: mkv.NoVideoControls,
+              wakelock: false,
             ),
           ),
           GlassPlayerControls(

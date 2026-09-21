@@ -25,15 +25,6 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getString(COUNTRY_STATUS) ?? 'US';
   }
 
-  static const DEFAULT_SCREEN_STATUS = 'defaultStatus';
-  Future<void> setDefaultHome(int deafultHomeValue) async {
-    sharedPrefsSingleton.setInt(DEFAULT_SCREEN_STATUS, deafultHomeValue);
-  }
-
-  Future<int> getDefaultHome() async {
-    return sharedPrefsSingleton.getInt(DEFAULT_SCREEN_STATUS) ?? 0;
-  }
-
   static const IMAGE_QUALITY_STATUS = "w500/";
   Future<void> setImageQuality(String imageQuality) async {
     sharedPrefsSingleton.setString(IMAGE_QUALITY_STATUS, imageQuality);

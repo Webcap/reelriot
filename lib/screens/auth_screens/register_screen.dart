@@ -251,6 +251,8 @@ class _SignupScreenState extends State<SignupScreen> {
           'profile_id': selectedProfile,
           'avatar': selectedProfile, // Added for Dual-Source Sync
           'verified': _isUserVerified,
+          'first_run': true,
+          'onboarding_completed': false,
         },
       );
 
@@ -313,10 +315,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
         debugPrint('[Signup] All DB records created – signup complete');
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const CaffieneHomePage()),
-        );
+        Get.offAllNamed(Routes.onboarding);
       } else {
         // Email confirmation is required by Supabase Auth – show verification notice dialog
         debugPrint('[Signup] Email confirmation required. Showing verification notice dialog.');

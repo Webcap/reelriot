@@ -138,7 +138,6 @@ Future<void> appInitialize() async {
   await settingsProvider.getCurrentThemeMode();
 // Material 3 removed
   await settingsProvider.getCurrentAdultMode();
-  await settingsProvider.getCurrentDefaultScreen();
   await settingsProvider.getCurrentImageQuality();
   await settingsProvider.getCurrentWatchCountry();
   await settingsProvider.getCurrentViewType();

@@ -191,7 +191,6 @@ abstract class LocaleKeys {
   static const list_view_type = 'list_view_type';
   static const list = 'list';
   static const grid = 'grid';
-  static const default_home_screen = 'default_home_screen';
   static const discover = 'discover';
   static const profile = 'profile';
   static const watch_country = 'watch_country';
@@ -545,4 +544,8 @@ abstract class LocaleKeys {
   static const install_permission_title = 'install_permission_title';
   static const install_permission_msg = 'install_permission_msg';
   static const season = 'season';
+  static const appearance = 'appearance';
+  static const playback = 'playback';
+  static const language_region = 'language_region';
+  static const device_storage = 'device_storage';
 }

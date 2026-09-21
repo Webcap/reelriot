@@ -212,7 +212,6 @@
     "list_view_type": "Tipo de vista de lista",
     "list": "Lista",
     "grid": "Cuadrícula",
-    "default_home_screen": "Pantalla de inicio predeterminada",
     "discover": "Descubrir",
     "profile": "Perfil",
     "watch_country": "País de visualización",
@@ -629,5 +628,9 @@
     "sign_in_or_create_account": "Iniciar sesión o crear cuenta",
     "sign_in_to_track": "INICIA SESIÓN PARA REGISTRAR",
     "track_viewing_habits": "Registra tus hábitos de visualización",
-    "track_viewing_habits_desc": "Inicia sesión o crea una cuenta para desbloquear tus estadísticas personales de tiempo de reproducción, registros de episodios e historial de visualización en todos tus dispositivos."
+    "track_viewing_habits_desc": "Inicia sesión o crea una cuenta para desbloquear tus estadísticas personales de tiempo de reproducción, registros de episodios e historial de visualización en todos tus dispositivos.",
+    "appearance": "Apariencia y pantalla",
+    "playback": "Reproducción y transmisión",
+    "language_region": "Localización y región",
+    "device_storage": "Dispositivo y almacenamiento"
 }

@@ -18,6 +18,7 @@ import 'package:reelriot/screens/tv_screens/widgets/tvepisode_cast_crew.dart';
 import 'package:reelriot/screens/tv_screens/widgets/tvseason_cast_crew_details.dart';
 import 'package:reelriot/utils/config.dart';
 import 'package:reelriot/widgets/shimmer_widget.dart';
+import 'package:reelriot/widgets/quality_badge.dart';
 import 'package:provider/provider.dart';
 import 'package:reelriot/utils/constant.dart';
 
@@ -295,6 +296,15 @@ class ScrollingTVState extends State<ScrollingTV>
                                                     ),
                                                   ),
                                                 ),
+                                              Positioned(
+                                                top: 4,
+                                                right: 4,
+                                                child: QualityBadge(
+                                                  mediaId: tvList![index].id,
+                                                  mediaType: 'tv',
+                                                  releaseDate: tvList![index].firstAirDate,
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),

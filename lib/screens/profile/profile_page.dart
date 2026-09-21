@@ -53,16 +53,32 @@ class _ProfilePageState extends State<ProfilePage> {
   final _supabase = Supabase.instance.client;
   GoTrueClient get _auth => _supabase.auth;
 
+  StreamSubscription<AuthState>? _authSubscription;
   Stream<Map<String, dynamic>>? _profileStream;
   Map<String, dynamic>? profileData;
   String? month;
   int? year;
   String? uid;
-  bool userAnonymous = false;
+  String? _lastTrackedUid;
 
   @override
   void initState() {
     super.initState();
+    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
+      final user = data.session?.user ?? _auth.currentUser;
+      final currentUid = (user != null && !user.isAnonymous) ? user.id : null;
+      if (currentUid != _lastTrackedUid) {
+        _lastTrackedUid = currentUid;
+        _initProfileStream();
+        getData();
+        if (mounted && currentUid != null) {
+          final recentPrv = Provider.of<RecentProvider>(context, listen: false);
+          recentPrv.syncFromCloud();
+          recentPrv.fetchWatchStatsFromApi();
+        }
+      }
+    });
+
     _initProfileStream();
     getData();
     // Proactively refresh remote config and caffeine-api watch stats on open
@@ -78,39 +94,83 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sp = Provider.of<SignInProvider>(context);
+    final user = _auth.currentUser;
+    final isAuth = sp.isSignedIn && user != null && !user.isAnonymous;
+    final currentUid = isAuth ? user.id : null;
+    if (currentUid != _lastTrackedUid) {
+      _lastTrackedUid = currentUid;
+      _initProfileStream();
+      getData();
+      if (currentUid != null) {
+        final recentPrv = Provider.of<RecentProvider>(context, listen: false);
+        recentPrv.syncFromCloud();
+        recentPrv.fetchWatchStatsFromApi();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
   void _initProfileStream() {
     final user = _auth.currentUser;
     if (user == null || user.isAnonymous) {
-      setState(() {
+      if (mounted) {
+        setState(() {
+          _profileStream = null;
+          uid = null;
+          profileData = null;
+        });
+      } else {
         _profileStream = null;
-        userAnonymous = user?.isAnonymous ?? true;
-      });
+        uid = null;
+        profileData = null;
+      }
       return;
     }
 
-    setState(() {
-      userAnonymous = false;
-      uid = user.id;
-      // Real-time stream from Supabase - the "Gold Standard" for sync
-      _profileStream = _supabase
-          .from('profiles')
-          .stream(primaryKey: ['id'])
-          .eq('id', user.id)
-          .limit(1)
-          .map((data) {
-            if (data.isNotEmpty) {
-              debugPrint('[Avatar Sync] 🟢 Received real-time update: profile_id=${data.first['profile_id']}');
-              profileData = data.first;
-              return data.first;
+    final newStream = _supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', user.id)
+        .limit(1)
+        .map((data) {
+          if (data.isNotEmpty) {
+            debugPrint('[Avatar Sync] 🟢 Received real-time update: profile_id=${data.first['profile_id']}');
+            profileData = data.first;
+            if (data.first['joined_at'] != null && (month == null || year == null)) {
+              try {
+                final dt = DateTime.parse(data.first['joined_at'].toString());
+                month = DateFormat('MMMM').format(DateTime(0, dt.month));
+                year = dt.year;
+              } catch (_) {}
             }
-            debugPrint('[Avatar Sync] ⚠️ Received empty profile update');
-            return profileData!;
-          })
-          .handleError((error) {
-            debugPrint('[Avatar Sync] ⚠️ Stream error: $error');
-            return profileData!;
-          });
-    });
+            return data.first;
+          }
+          debugPrint('[Avatar Sync] ⚠️ Received empty profile update');
+          return profileData ?? <String, dynamic>{};
+        })
+        .handleError((error) {
+          debugPrint('[Avatar Sync] ⚠️ Stream error: $error');
+          return profileData ?? <String, dynamic>{};
+        });
+
+    if (mounted) {
+      setState(() {
+        uid = user.id;
+        _profileStream = newStream;
+      });
+    } else {
+      uid = user.id;
+      _profileStream = newStream;
+    }
   }
 
   // Legacy method kept for non-avatar metadata if needed
@@ -153,7 +213,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final textSec = isDark ? _C.textSecDark : _C.textSecLight;
     final textTert = isDark ? _C.textTertDark : _C.textTertLight;
 
-    if (!sp.isSignedIn || userAnonymous) {
+    final user = _auth.currentUser;
+    final isGuest = !sp.isSignedIn || user == null || user.isAnonymous;
+
+    if (isGuest) {
       return Scaffold(
         backgroundColor: bg,
         body: GuestProfileContent(
@@ -170,6 +233,10 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
+    if (_profileStream == null || uid != user.id) {
+      _initProfileStream();
+    }
+
     return StreamBuilder<Map<String, dynamic>>(
       stream: _profileStream,
       builder: (context, snapshot) {
@@ -180,8 +247,8 @@ class _ProfilePageState extends State<ProfilePage> {
             profileData ??
             <String, dynamic>{
               'name': sp.name ?? 'ReelRiot User',
-              'username': sp.name ?? 'ReelRiot User',
-              'profile_id': sp.profileId ?? '0',
+              'username': sp.username ?? sp.name ?? 'ReelRiot User',
+              'profile_id': sp.profileId ?? 0,
               'image_url': sp.imageUrl ?? '',
             };
 
@@ -376,6 +443,20 @@ class _ProfilePageState extends State<ProfilePage> {
                     fontFamily: 'PoppinsSB',
                   ),
                 ),
+                if (data['username'] != null &&
+                    data['username'].toString().isNotEmpty &&
+                    data['username'] != data['name']) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '@${data['username']}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textSec,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 3),
                 Row(
                   children: [
@@ -491,6 +572,20 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           textAlign: TextAlign.center,
         ),
+        if (data['username'] != null &&
+            data['username'].toString().isNotEmpty &&
+            data['username'] != data['name']) ...[
+          const SizedBox(height: 2),
+          Text(
+            '@${data['username']}',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: textSec,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
         const SizedBox(height: 4),
         Text(
           '${tr('joined')}: ${month ?? ''} ${year ?? ''}',

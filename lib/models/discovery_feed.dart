@@ -13,13 +13,13 @@ class DiscoveryFeed {
   const DiscoveryFeed({required this.rows});
 
   factory DiscoveryFeed.fromJson(dynamic json) {
-    if (json is Map<String, dynamic>) {
-      final rawRows = json['rows'];
+    if (json is Map) {
+      final rawRows = json['rows'] ?? json['sections'];
       if (rawRows is List) {
         return DiscoveryFeed(
           rows: rawRows
-              .whereType<Map<String, dynamic>>()
-              .map(DiscoveryRow.fromJson)
+              .whereType<Map>()
+              .map((m) => DiscoveryRow.fromJson(Map<String, dynamic>.from(m)))
               .toList(),
         );
       }

@@ -8,6 +8,7 @@ import 'package:reelriot/screens/movie_screens/movie_details.dart';
 import 'package:reelriot/utils/config.dart';
 import 'package:reelriot/widgets/shimmer_widget.dart';
 import 'package:reelriot/utils/constant.dart';
+import 'package:reelriot/widgets/quality_badge.dart';
 import 'package:provider/provider.dart';
 
 class MovieGridView extends StatelessWidget {
@@ -137,6 +138,15 @@ class MovieGridItem extends StatelessWidget {
                               Text((movie.voteAverage ?? 0.0).toStringAsFixed(1))
                             ],
                           ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 3,
+                        right: 3,
+                        child: QualityBadge(
+                          mediaId: movie.id,
+                          mediaType: 'movie',
+                          releaseDate: movie.releaseDate,
                         ),
                       ),
                     ],

@@ -213,7 +213,6 @@
     "list_view_type": "List view type",
     "list": "List",
     "grid": "Grid",
-    "default_home_screen": "Default home screen",
     "discover": "Discover",
     "profile": "Profile",
     "watch_country": "Watch Country",
@@ -632,5 +631,9 @@
     "sign_in_or_create_account": "Sign In or Create Account",
     "sign_in_to_track": "SIGN IN TO TRACK",
     "track_viewing_habits": "Track Your Viewing Habits",
-    "track_viewing_habits_desc": "Sign in or create an account to unlock your personal watch time statistics, episode logs, and viewing history across all your devices."
+    "track_viewing_habits_desc": "Sign in or create an account to unlock your personal watch time statistics, episode logs, and viewing history across all your devices.",
+    "appearance": "Appearance & Display",
+    "playback": "Playback & Streaming",
+    "language_region": "Localization & Region",
+    "device_storage": "Device & Storage"
 }

@@ -10,6 +10,7 @@ class AnalyticsService {
 
   Mixpanel? _mixpanel;
   bool _initialized = false;
+  String? _currentToken;
   String? _appVersion;
 
   Future<void> initialize(String token) async {
@@ -18,14 +19,15 @@ class AnalyticsService {
       return;
     }
 
-    if (_initialized) return;
+    if (_initialized && _currentToken == token) return;
 
     try {
       _appVersion = currentAppVersion;
 
       _mixpanel = await Mixpanel.init(token, trackAutomaticEvents: true);
       _initialized = true;
-      debugPrint('Mixpanel initialized successfully');
+      _currentToken = token;
+      debugPrint('Mixpanel initialized successfully with token: ${token.substring(0, 6)}...');
       trackEvent('App Started');
     } catch (e) {
       debugPrint('Failed to initialize Mixpanel: $e');

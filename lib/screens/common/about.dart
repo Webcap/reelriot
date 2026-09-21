@@ -115,8 +115,6 @@ class AboutPage extends StatelessWidget {
                           child: Column(
                             children: [
                               _buildTmdbCard(surface, border, textPrim, textSec),
-                              const SizedBox(height: 16),
-                              _buildAppSpecsCard(surface, border, textPrim, textSec),
                             ],
                           ),
                         ),
@@ -130,8 +128,6 @@ class AboutPage extends StatelessWidget {
                         _buildDisclaimerCard(surface, border, textPrim, textSec),
                         const SizedBox(height: 16),
                         _buildTmdbCard(surface, border, textPrim, textSec),
-                        const SizedBox(height: 16),
-                        _buildAppSpecsCard(surface, border, textPrim, textSec),
                       ],
                     ),
 
@@ -594,75 +590,7 @@ class AboutPage extends StatelessWidget {
     );
   }
 
-  // ── App Specs Card ─────────────────────────────────────────────────────────
-  Widget _buildAppSpecsCard(Color surface, Color border, Color textPrim, Color textSec) {
-    return _AboutCard(
-      surface: surface,
-      border: border,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _Design.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.info_outline_rounded,
-                  color: _Design.primary,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Application Info',
-                style: TextStyle(
-                  color: textPrim,
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'PoppinsSB',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildSpecRow('Version', 'v$currentAppVersion', textPrim, textSec),
-          const Divider(height: 16),
-          _buildSpecRow('Engine', 'Caffeine Core', textPrim, textSec),
-          const Divider(height: 16),
-          _buildSpecRow('Platform', 'Cross-Platform Mobile & Tablet', textPrim, textSec),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSpecRow(String label, String value, Color textPrim, Color textSec) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: textSec,
-            fontSize: 12.5,
-            fontFamily: 'Poppins',
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: textPrim,
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'PoppinsSB',
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _AboutCard extends StatelessWidget {

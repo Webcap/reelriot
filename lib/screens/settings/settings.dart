@@ -341,7 +341,7 @@ class _SettingsState extends State<Settings> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildSectionTitle(
-                                tr("appearance") != "appearance" ? tr("appearance") : "APPEARANCE & DISPLAY",
+                                tr("appearance"),
                                 Icons.palette_outlined,
                                 textSec,
                               ),
@@ -349,7 +349,7 @@ class _SettingsState extends State<Settings> {
                               appearanceCard,
                               const SizedBox(height: 24),
                               _buildSectionTitle(
-                                tr("language_region") != "language_region" ? tr("language_region") : "LOCALIZATION & REGION",
+                                tr("language_region"),
                                 Icons.language_rounded,
                                 textSec,
                               ),
@@ -365,7 +365,7 @@ class _SettingsState extends State<Settings> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildSectionTitle(
-                                tr("playback") != "playback" ? tr("playback") : "PLAYBACK & STREAMING",
+                                tr("playback"),
                                 Icons.play_circle_outline_rounded,
                                 textSec,
                               ),
@@ -373,7 +373,7 @@ class _SettingsState extends State<Settings> {
                               playbackCard,
                               const SizedBox(height: 24),
                               _buildSectionTitle(
-                                tr("device_storage") != "device_storage" ? tr("device_storage") : "DEVICE & STORAGE",
+                                tr("device_storage"),
                                 Icons.devices_other_rounded,
                                 textSec,
                               ),
@@ -388,7 +388,7 @@ class _SettingsState extends State<Settings> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSectionTitle(
-                          tr("appearance") != "appearance" ? tr("appearance") : "APPEARANCE & DISPLAY",
+                          tr("appearance"),
                           Icons.palette_outlined,
                           textSec,
                         ),
@@ -397,7 +397,7 @@ class _SettingsState extends State<Settings> {
                         const SizedBox(height: 20),
 
                         _buildSectionTitle(
-                          tr("playback") != "playback" ? tr("playback") : "PLAYBACK & STREAMING",
+                          tr("playback"),
                           Icons.play_circle_outline_rounded,
                           textSec,
                         ),
@@ -406,7 +406,7 @@ class _SettingsState extends State<Settings> {
                         const SizedBox(height: 20),
 
                         _buildSectionTitle(
-                          tr("language_region") != "language_region" ? tr("language_region") : "LOCALIZATION & REGION",
+                          tr("language_region"),
                           Icons.language_rounded,
                           textSec,
                         ),
@@ -415,7 +415,7 @@ class _SettingsState extends State<Settings> {
                         const SizedBox(height: 20),
 
                         _buildSectionTitle(
-                          tr("device_storage") != "device_storage" ? tr("device_storage") : "DEVICE & STORAGE",
+                          tr("device_storage"),
                           Icons.devices_other_rounded,
                           textSec,
                         ),
@@ -511,26 +511,6 @@ class _SettingsState extends State<Settings> {
             items: const ['list', 'grid'],
             labels: [tr("list"), tr("grid")],
             onChanged: (v) => setState(() => sv.defaultView = v!),
-            textPrim: textPrim,
-            textSec: textSec,
-          ),
-        ),
-        const _Divider(),
-        _SettingsTile(
-          icon: Icons.home_rounded,
-          title: tr("default_home_screen"),
-          textPrim: textPrim,
-          textSec: textSec,
-          trailing: StyledDropdown<int>(
-            value: sv.defaultValue,
-            items: const [0, 1, 2, 3],
-            labels: [
-              tr("movies"),
-              tr("tv_shows"),
-              tr("discover"),
-              tr("profile"),
-            ],
-            onChanged: (v) => setState(() => sv.defaultValue = v!),
             textPrim: textPrim,
             textSec: textSec,
           ),

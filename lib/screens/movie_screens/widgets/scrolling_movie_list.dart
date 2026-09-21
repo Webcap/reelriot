@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 import 'package:reelriot/utils/constant.dart';
 import 'package:reelriot/models/ad.dart';
 import 'package:reelriot/widgets/native_ad_poster_card.dart';
+import 'package:reelriot/widgets/quality_badge.dart';
 
 class ScrollingMovies extends StatefulWidget {
   final String api, title;
@@ -182,23 +183,27 @@ class ScrollingMoviesState extends State<ScrollingMovies>
                         padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 8),
                         itemCount: (() {
                           final appDep = Provider.of<AppDependencyProvider>(context, listen: false);
-                          final ads = appDep.initialAds.where((a) => a.matchesPlacement('poster')).toList();
-                          return moviesList!.length + (ads.isNotEmpty ? 1 : 0);
+                          final hasAd = appDep.enablePosterAds && appDep.initialAds.any((a) => a.matchesPlacement('poster'));
+                          return moviesList!.length + (hasAd ? 1 : 0);
                         })(),
                         scrollDirection: Axis.horizontal,
                         itemBuilder: (BuildContext context, int index) {
                           final appDep = Provider.of<AppDependencyProvider>(context, listen: false);
-                          final posterAds = appDep.initialAds.where((a) => a.matchesPlacement('poster')).toList();
+                          final posterAds = appDep.enablePosterAds
+                              ? appDep.initialAds.where((a) => a.matchesPlacement('poster')).toList()
+                              : <Ad>[];
+                          final hasAd = posterAds.isNotEmpty;
                           
                           int adPos = 5;
                           if (widget.title.toLowerCase().contains('trending')) adPos = 3;
                           if (widget.title.toLowerCase().contains('popular')) adPos = 1;
 
-                          if (posterAds.isNotEmpty && index == adPos) {
-                            return NativeAdPosterCard(ad: posterAds.first);
+                          if (hasAd && index == adPos) {
+                            final adIndex = widget.title.hashCode.abs() % posterAds.length;
+                            return NativeAdPosterCard(ad: posterAds[adIndex]);
                           }
 
-                          final movieIndex = (posterAds.isNotEmpty && index > adPos) ? index - 1 : index;
+                          final movieIndex = (hasAd && index > adPos) ? index - 1 : index;
                           if (movieIndex >= moviesList!.length) return const SizedBox.shrink();
                           
                           final movie = moviesList![movieIndex];
@@ -319,6 +324,15 @@ class ScrollingMoviesState extends State<ScrollingMovies>
                                                     ),
                                                   ),
                                                 ),
+                                              Positioned(
+                                                top: 4,
+                                                right: 4,
+                                                child: QualityBadge(
+                                                  mediaId: movie.id,
+                                                  mediaType: 'movie',
+                                                  releaseDate: movie.releaseDate,
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:reelriot/services/analytics_service.dart';
 import 'package:reelriot/utils/config.dart';
 
 Future<void> fetchConfigFromApi(
@@ -64,7 +65,12 @@ Future<void> fetchConfigFromApi(
           (v) => appDependencyProvider.enableAnonymousSignIn = v);
       setBool('enable_google_signin',
           (v) => appDependencyProvider.enableGoogleSignIn = v);
-      setString('mixpanel_token', (v) => appDependencyProvider.mixpanelToken = v);
+      setString('mixpanel_token', (v) {
+        appDependencyProvider.mixpanelToken = v;
+        if (v.isNotEmpty) {
+          AnalyticsService.instance.initialize(v);
+        }
+      });
       setString('caffeine_api_url', (v) {
         if (isCaffeineApiPreviewUrl(v)) return;
         // In debug, don't overwrite with localhost (API default); keep .env URL.

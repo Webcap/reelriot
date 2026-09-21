@@ -14,9 +14,6 @@ class SettingsProvider with ChangeNotifier {
   String _appTheme = "dark";
   String get appTheme => _appTheme;
 
-  int _defaultValue = 0;
-  int get defaultValue => _defaultValue;
-
   String _imageQuality = "w500/";
   String get imageQuality => _imageQuality;
 
@@ -87,17 +84,6 @@ class SettingsProvider with ChangeNotifier {
   set isAdult(bool value) {
     _isAdult = value;
     _settingsPreferences.setAdultMode(value);
-    notifyListeners();
-  }
-
-  // screen preference
-  Future<void> getCurrentDefaultScreen() async {
-    defaultValue = await _settingsPreferences.getDefaultHome();
-  }
-
-  set defaultValue(int value) {
-    _defaultValue = value;
-    _settingsPreferences.setDefaultHome(value);
     notifyListeners();
   }
 

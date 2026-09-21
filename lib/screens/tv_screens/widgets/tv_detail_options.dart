@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:reelriot/widgets/bouncing_tappable.dart';
 import 'package:reelriot/widgets/user_rating_widget.dart';
 import 'package:reelriot/services/offline_sync_manager.dart';
+import 'package:reelriot/widgets/quality_badge.dart';
 
 // ── Design tokens (design.json) ─────────────────────────────────────────────
 class _C {
@@ -145,9 +146,13 @@ class _TVDetailOptionsState extends State<TVDetailOptions> {
                                 ],
                               ),
                               
-                            // Badges
                             _Badge(text: 'TV-14', textSec: textSec, border: border, elevated: elevated),
-                            _Badge(text: 'FHD', textSec: textSec, border: border, elevated: Colors.red.withValues(alpha: 0.2), textColor: _C.primary),
+                            QualityBadge(
+                              mediaId: widget.tvSeries.id,
+                              mediaType: 'tv',
+                              releaseDate: widget.tvSeries.firstAirDate,
+                              compact: false,
+                            ),
                             
                             if (ratingStr != null)
                               Container(
@@ -247,14 +252,12 @@ class _Badge extends StatelessWidget {
   final Color textSec;
   final Color border;
   final Color elevated;
-  final Color? textColor;
 
   const _Badge({
     required this.text,
     required this.textSec,
     required this.border,
     required this.elevated,
-    this.textColor,
   });
 
   @override
@@ -271,7 +274,7 @@ class _Badge extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: textColor ?? textSec,
+          color: textSec,
           fontFamily: 'PoppinsSB',
         ),
       ),

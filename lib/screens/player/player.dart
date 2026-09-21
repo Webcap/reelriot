@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:reelriot/services/wakelock_service.dart';
 import 'package:reelriot/utils/globals.dart';
 import 'package:reelriot/controller/recently_watched_database_controller.dart';
 import 'package:reelriot/models/sub_languages.dart';
@@ -184,6 +184,7 @@ class _PlayerState extends State<Player> with WidgetsBindingObserver {
 
     // Periodic save every 10 seconds to minimise progress loss on hard-kill.
     _periodicSaveTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      WakelockService.reassert();
       if (_betterPlayerController.isVideoInitialized() == true || _isEmbed) {
         final elapsed = _currentElapsedMs;
         if (widget.mediaType == MediaType.movie) {
@@ -200,7 +201,7 @@ class _PlayerState extends State<Player> with WidgetsBindingObserver {
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    WakelockPlus.enable();
+    WakelockService.enable();
 
     _currentSources = Map.from(widget.sources);
     _currentSubs = List.from(widget.subs);
@@ -665,6 +666,7 @@ class _PlayerState extends State<Player> with WidgetsBindingObserver {
             : insertRecentEpisodeData();
       }
     } else if (isResuming) {
+      WakelockService.enable();
       // If we are resuming and casting, check if the cast finished while away.
       // CastService is a ChangeNotifier, so it should trigger a build automatically
       // if it received a message while in the background (if proxy/socket stayed alive).
@@ -811,7 +813,7 @@ class _PlayerState extends State<Player> with WidgetsBindingObserver {
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    WakelockPlus.disable();
+    WakelockService.disable();
 
     super.dispose();
   }
@@ -1159,6 +1161,7 @@ class _PlayerState extends State<Player> with WidgetsBindingObserver {
                 child: mkv.Video(
                   controller: _betterPlayerController.videoController,
                   controls: mkv.NoVideoControls,
+                  wakelock: false,
                 ),
               ),
               StreamBuilder<bool>(
