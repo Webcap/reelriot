@@ -1,3 +1,6 @@
+import 'package:reelriot/models/discovery_feed.dart';
+import 'package:reelriot/services/discovery_service.dart';
+import 'package:reelriot/widgets/discovery_row_widget.dart';
 import 'package:reelriot/models/recently_watched.dart';
 import 'package:reelriot/provider/recently_watched_provider.dart';
 import 'package:reelriot/provider/sign_in_provider.dart';
@@ -27,6 +30,35 @@ class MainTVDisplay extends StatefulWidget {
 
 class _MainTVDisplayState extends State<MainTVDisplay> {
   Key _refreshKey = UniqueKey();
+  DiscoveryFeed? _feed;
+  bool _feedLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchDiscoveryFeed();
+    });
+  }
+
+  Future<void> _fetchDiscoveryFeed() async {
+    final appDep = Provider.of<AppDependencyProvider>(context, listen: false);
+    final signIn = Provider.of<SignInProvider>(context, listen: false);
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+
+    final feed = await DiscoveryService.instance.fetchHomeFeed(
+      caffeineBaseUrl: appDep.caffeineAPIURL,
+      userId: signIn.uid,
+      mediaType: 'tv',
+      region: settings.defaultCountry,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _feed = feed;
+      _feedLoaded = true;
+    });
+  }
 
   Future<void> _refreshData() async {
     final recent = Provider.of<RecentProvider>(context, listen: false);
@@ -36,6 +68,7 @@ class _MainTVDisplayState extends State<MainTVDisplay> {
       recent.fetchEpisodes(),
       recent.fetchWatchStatsFromApi(),
       appDep.fetchSportsStreams(),
+      _fetchDiscoveryFeed(),
     ]).catchError((e) {
       debugPrint('[MainTVDisplay] Refresh error: $e');
       return <void>[];
@@ -51,6 +84,7 @@ class _MainTVDisplayState extends State<MainTVDisplay> {
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
+    final appDep = Provider.of<AppDependencyProvider>(context);
     final isDark = settings.appTheme == 'dark' || settings.appTheme == 'amoled';
     final signIn = Provider.of<SignInProvider>(context);
     final isSignedIn = signIn.isSignedIn;
@@ -86,6 +120,21 @@ class _MainTVDisplayState extends State<MainTVDisplay> {
                   episodesList: rEpisodes,
                   title: tr("up_next"),
                 ),
+
+              // ── Dynamic Discovery Rows (including Seasonal / Holiday Magic) ──
+              if (_feedLoaded && _feed != null && _feed!.rows.any((r) => r.type != 'featured'))
+                ..._feed!.rows.where((row) => row.type != 'featured').map((row) {
+                  return DiscoveryRowWidget(
+                    row: row,
+                    isDark: isDark,
+                    themeMode: settings.appTheme,
+                    imageQuality: settings.imageQuality,
+                    isProxyEnabled: settings.enableProxy,
+                    proxyUrl: appDep.tmdbProxy,
+                    lang: lang,
+                    includeAdult: settings.isAdult,
+                  );
+                }),
               ScrollingTV(
                 key: ValueKey('popular_${_refreshKey.toString()}'),
                 includeAdult: settings.isAdult,
