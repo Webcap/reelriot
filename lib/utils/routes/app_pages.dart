@@ -8,6 +8,7 @@ import 'package:reelriot/screens/home_screen/dash_screen.dart';
 import 'package:reelriot/screens/profile/profile_page.dart';
 import 'package:reelriot/screens/watch_history/watch_history_v2.dart';
 import 'package:reelriot/screens/pair_tv_screen.dart';
+import 'package:reelriot/screens/onboarding/onboarding_screen.dart';
 import 'package:reelriot/utils/helpers/no_connection_screen.dart';
 import 'package:get/get.dart';
 
@@ -69,6 +70,11 @@ abstract class AppPages {
       name: Routes.pairTv,
       page: PairTvScreen.new,
       transition: Transition.upToDown,
+    ),
+    GetPage(
+      name: Routes.onboarding,
+      page: OnboardingScreen.new,
+      transition: Transition.fade,
     ),
   ];
 }

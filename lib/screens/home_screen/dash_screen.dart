@@ -18,6 +18,8 @@ import 'package:reelriot/screens/search/search_view.dart' show SearchPage;
 import 'package:reelriot/screens/tv_screens/tv_screen.dart';
 import 'package:reelriot/widgets/drawer_widget.dart';
 import 'package:reelriot/widgets/offline_indicator_banner.dart';
+import 'package:reelriot/utils/routes/app_pages.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 // ─── Design token constants (mirrors design.json) ────────────────────────────
@@ -66,14 +68,47 @@ class _CaffieneHomePageState extends State<CaffieneHomePage> {
     _TabMeta(icon: Icons.person_rounded, label: 'Profile'),
   ];
 
+  bool _hasLaunchedOnboarding = false;
+  VoidCallback? _authListener;
+
   @override
   void initState() {
+    super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _checkOnboarding();
+      final sp = Provider.of<SignInProvider>(context, listen: false);
+      _authListener = () {
+        if (mounted) _checkOnboarding();
+      };
+      sp.addListener(_authListener!);
+
       checkForcedUpdate();
       Provider.of<BookmarksProvider>(context, listen: false).syncIfNeeded();
       RatingsProvider.instance.fetchRatings();
     });
-    super.initState();
+  }
+
+  @override
+  void dispose() {
+    if (_authListener != null) {
+      try {
+        Provider.of<SignInProvider>(context, listen: false)
+            .removeListener(_authListener!);
+      } catch (_) {}
+    }
+    super.dispose();
+  }
+
+  void _checkOnboarding() {
+    if (!mounted || _hasLaunchedOnboarding) return;
+    final sp = Provider.of<SignInProvider>(context, listen: false);
+    if (sp.isSignedIn && sp.firstRun == true) {
+      _hasLaunchedOnboarding = true;
+      Get.toNamed(Routes.onboarding)?.then((_) {
+        _hasLaunchedOnboarding = false;
+      });
+    }
   }
 
   Future<void> checkForcedUpdate() async {

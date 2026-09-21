@@ -12,6 +12,7 @@ abstract class Routes {
   static const profile = '/profile';
   static const watchHistory = '/watchHistory';
   static const pairTv = '/pairTv';
+  static const onboarding = '/onboarding';
 }
 
 abstract class AppRoutes {
@@ -26,4 +27,5 @@ abstract class AppRoutes {
   static const profile = Routes.profile;
   static const watchHistory = Routes.watchHistory;
   static const pairTv = Routes.pairTv;
+  static const onboarding = Routes.onboarding;
 }

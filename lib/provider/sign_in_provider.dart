@@ -364,8 +364,47 @@ class SignInProvider extends ChangeNotifier {
       'provider': _provider ?? 'email',
       'verified': false,
       'is_subscribed': false,
-      'first_run': false,
+      'first_run': true,
     });
+    _firstRun = true;
+    notifyListeners();
+  }
+
+  /// Completes the onboarding flow for the authenticated user, persisting
+  /// the selected avatar and toggling first_run to false.
+  Future<void> completeOnboarding({required int avatarId}) async {
+    final uid = _uid;
+    if (uid == null) return;
+
+    final supabase = Supabase.instance.client;
+
+    // 1. Primary Sync: Update the profiles table
+    try {
+      await supabase.from('profiles').update({
+        'profile_id': avatarId,
+        'first_run': false,
+      }).eq('id', uid);
+    } catch (e) {
+      debugPrint('[Auth] ⚠️ completeOnboarding profiles update error: $e');
+    }
+
+    // 2. Secondary Sync: Update Auth metadata
+    try {
+      await supabase.auth.updateUser(
+        UserAttributes(
+          data: {
+            'avatar': avatarId.toString(),
+            'profile_id': avatarId,
+            'onboarding_completed': true,
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('[Auth] ⚠️ completeOnboarding auth metadata update error: $e');
+    }
+
+    _firstRun = false;
+    _profileId = avatarId;
     notifyListeners();
   }
 

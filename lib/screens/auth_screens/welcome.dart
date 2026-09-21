@@ -45,15 +45,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final sp = context.read<SignInProvider>();
-      if (sp.isSignedIn) {
-        Get.offAllNamed(Routes.dash);
-        return;
-      }
-      _authListener = () {
-        if (sp.isSignedIn && mounted) {
+      void checkAndNavigate() {
+        if (!mounted || !sp.isSignedIn) return;
+        if (sp.firstRun == true) {
+          Get.offAllNamed(Routes.onboarding);
+        } else {
           Get.offAllNamed(Routes.dash);
         }
-      };
+      }
+
+      if (sp.isSignedIn) {
+        checkAndNavigate();
+        return;
+      }
+      _authListener = checkAndNavigate;
       sp.addListener(_authListener!);
     });
   }
@@ -74,7 +79,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with WidgetsBindingObserv
     if (state == AppLifecycleState.resumed) {
       final sp = context.read<SignInProvider>();
       if (sp.isSignedIn) {
-        Get.offAllNamed(Routes.dash);
+        if (sp.firstRun == true) {
+          Get.offAllNamed(Routes.onboarding);
+        } else {
+          Get.offAllNamed(Routes.dash);
+        }
       } else {
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted && !sp.isSignedIn) {
