@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:reelriot/provider/app_dependency_provider.dart';
+import 'package:reelriot/utils/routes/app_pages.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatMessage {
@@ -75,10 +77,12 @@ class _EventChatroomState extends State<EventChatroom> {
 
   bool _loading = true;
   bool _isSending = false;
+  bool _isSignedIn = false;
   int _presenceCount = 1;
   String? _currentUserRole = 'user';
   String _currentUsername = 'Anonymous';
   String? _currentUserId;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
@@ -86,6 +90,9 @@ class _EventChatroomState extends State<EventChatroom> {
     _initUser();
     _fetchMessages();
     _initRealtimeChannels();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      if (mounted) _initUser();
+    });
   }
 
   @override
@@ -102,6 +109,7 @@ class _EventChatroomState extends State<EventChatroom> {
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _cleanupChannels();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
@@ -124,10 +132,14 @@ class _EventChatroomState extends State<EventChatroom> {
 
   Future<void> _initUser() async {
     final session = Supabase.instance.client.auth.currentSession;
-    if (session?.user != null) {
-      _currentUserId = session!.user.id;
-      final metaName = session.user.userMetadata?['username']?.toString() ??
-          session.user.email?.split('@').first;
+    final user = session?.user;
+    final isAuth = user != null && !user.isAnonymous;
+    _isSignedIn = isAuth;
+
+    if (isAuth) {
+      _currentUserId = user.id;
+      final metaName = user.userMetadata?['username']?.toString() ??
+          user.email?.split('@').first;
       _currentUsername = metaName ?? 'User';
 
       try {
@@ -147,8 +159,8 @@ class _EventChatroomState extends State<EventChatroom> {
         }
       } catch (_) {}
     } else {
-      _currentUserId = 'guest_${DateTime.now().millisecondsSinceEpoch % 10000}';
-      _currentUsername = 'Guest_${DateTime.now().millisecondsSinceEpoch % 1000}';
+      _currentUserId = null;
+      _currentUsername = 'Guest';
     }
     if (mounted) setState(() {});
   }
@@ -298,6 +310,7 @@ class _EventChatroomState extends State<EventChatroom> {
   }
 
   Future<void> _sendMessage([String? quickContent]) async {
+    if (!_isSignedIn) return;
     final text = (quickContent ?? _textCtrl.text).trim();
     if (text.isEmpty || _isSending) return;
 
@@ -441,8 +454,11 @@ class _EventChatroomState extends State<EventChatroom> {
                     ? _buildEmptyChat()
                     : _buildMessageList(),
           ),
-          _buildQuickReactions(),
-          _buildInputBar(),
+          if (_isSignedIn) ...[
+            _buildQuickReactions(),
+            _buildInputBar(),
+          ] else
+            _buildSignInPrompt(),
         ],
       ),
     );
@@ -691,6 +707,74 @@ class _EventChatroomState extends State<EventChatroom> {
           fontSize: 9,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignInPrompt() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0B0F14),
+        border: Border(top: BorderSide(color: Color(0x14FFFFFF))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: Color(0xFFDC2626),
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Sign in to join the conversation',
+                  style: TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Get.toNamed(Routes.login),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Sign In',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
