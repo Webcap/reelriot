@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:caffeine_core/caffeine_core.dart';
 import 'package:reelriot/provider/app_dependency_provider.dart';
 import 'package:reelriot/provider/bookmarks_provider.dart';
 import 'package:reelriot/provider/ratings_provider.dart';
@@ -313,14 +314,20 @@ class _GreetingTitle extends StatelessWidget {
                     )
                   : hasProfileAvatar
                       ? ClipOval(
-                          child: Image.asset(
-                            'assets/images/profiles/${signIn.profileId}.png',
+                          child: CachedNetworkImage(
+                            imageUrl: AvatarUtils.getAvatarUrl(signIn.profileId),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Icon(
-                                Icons.person_rounded,
-                                size: isTablet ? 24 : 20,
-                                color: _C.primary,
+                            memCacheWidth: 100,
+                            memCacheHeight: 100,
+                            errorWidget: (_, __, ___) => Image.asset(
+                              'assets/images/profiles/${signIn.profileId}.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Icon(
+                                  Icons.person_rounded,
+                                  size: isTablet ? 24 : 20,
+                                  color: _C.primary,
+                                ),
                               ),
                             ),
                           ),
@@ -618,13 +625,19 @@ class _TabButton extends StatelessWidget {
                                   color: isActive ? _C.primary : inactiveColor,
                                 ),
                               )
-                            : Image.asset(
-                                'assets/images/profiles/${signIn.profileId}.png',
+                            : CachedNetworkImage(
+                                imageUrl: AvatarUtils.getAvatarUrl(signIn.profileId),
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.person_rounded,
-                                  size: iconSize * 0.7,
-                                  color: isActive ? _C.primary : inactiveColor,
+                                memCacheWidth: (iconSize * 2).round(),
+                                memCacheHeight: (iconSize * 2).round(),
+                                errorWidget: (_, __, ___) => Image.asset(
+                                  'assets/images/profiles/${signIn.profileId}.png',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.person_rounded,
+                                    size: iconSize * 0.7,
+                                    color: isActive ? _C.primary : inactiveColor,
+                                  ),
                                 ),
                               ),
                       ),

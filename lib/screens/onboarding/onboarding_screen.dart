@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:caffeine_core/caffeine_core.dart';
 import 'package:get/get.dart';
 import 'package:reelriot/models/profile_image_list.dart';
 import 'package:reelriot/provider/sign_in_provider.dart';
@@ -393,14 +395,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         fit: StackFit.expand,
                         children: [
                           ClipOval(
-                            child: Image.asset(
-                              'assets/images/profiles/${profile.index}.png',
+                            child: CachedNetworkImage(
+                              imageUrl: AvatarUtils.getAvatarUrl(profile.index),
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.white.withValues(alpha: 0.05),
-                                child: const Icon(
-                                  Icons.person_rounded,
-                                  color: _primaryColor,
+                              memCacheWidth: 160,
+                              memCacheHeight: 160,
+                              placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.05)),
+                              errorWidget: (_, __, ___) => Image.asset(
+                                'assets/images/profiles/${profile.index}.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  child: const Icon(
+                                    Icons.person_rounded,
+                                    color: _primaryColor,
+                                  ),
                                 ),
                               ),
                             ),
@@ -529,9 +538,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
                 padding: const EdgeInsets.all(4),
                 child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/profiles/$_selectedAvatarId.png',
+                  child: CachedNetworkImage(
+                    imageUrl: AvatarUtils.getAvatarUrl(_selectedAvatarId),
                     fit: BoxFit.cover,
+                    memCacheWidth: 240,
+                    memCacheHeight: 240,
+                    errorWidget: (_, __, ___) => Image.asset(
+                      'assets/images/profiles/$_selectedAvatarId.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:caffeine_core/caffeine_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:reelriot/models/profile_image_list.dart';
 import 'package:reelriot/provider/settings_provider.dart';
@@ -550,14 +552,21 @@ class _ProfileEditState extends State<ProfileEdit> {
                                   fit: StackFit.expand,
                                   children: [
                                     ClipOval(
-                                      child: Image.asset(
-                                        'assets/images/profiles/${profile.index}.png',
+                                      child: CachedNetworkImage(
+                                        imageUrl: AvatarUtils.getAvatarUrl(profile.index),
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          color: cardBg,
-                                          child: const Icon(
-                                            Icons.person_rounded,
-                                            color: _Design.primary,
+                                        memCacheWidth: 160,
+                                        memCacheHeight: 160,
+                                        placeholder: (_, __) => Container(color: cardBg),
+                                        errorWidget: (_, __, ___) => Image.asset(
+                                          'assets/images/profiles/${profile.index}.png',
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: cardBg,
+                                            child: const Icon(
+                                              Icons.person_rounded,
+                                              color: _Design.primary,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -884,15 +893,22 @@ class _ProfileEditState extends State<ProfileEdit> {
                       ],
                     ),
                     child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/profiles/$_selectedProfileId.png',
+                      child: CachedNetworkImage(
+                        imageUrl: AvatarUtils.getAvatarUrl(_selectedProfileId),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: cardBg,
-                          child: const Icon(
-                            Icons.person_rounded,
-                            size: 48,
-                            color: _Design.primary,
+                        memCacheWidth: 200,
+                        memCacheHeight: 200,
+                        placeholder: (_, __) => Container(color: cardBg),
+                        errorWidget: (_, __, ___) => Image.asset(
+                          'assets/images/profiles/$_selectedProfileId.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: cardBg,
+                            child: const Icon(
+                              Icons.person_rounded,
+                              size: 48,
+                              color: _Design.primary,
+                            ),
                           ),
                         ),
                       ),
@@ -998,12 +1014,19 @@ class _ProfileEditState extends State<ProfileEdit> {
                       ),
                       padding: const EdgeInsets.all(2),
                       child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/profiles/${profile.index}.png',
+                        child: CachedNetworkImage(
+                          imageUrl: AvatarUtils.getAvatarUrl(profile.index),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: cardBg,
-                            child: const Icon(Icons.person, size: 20),
+                          memCacheWidth: 100,
+                          memCacheHeight: 100,
+                          placeholder: (_, __) => Container(color: cardBg),
+                          errorWidget: (_, __, ___) => Image.asset(
+                            'assets/images/profiles/${profile.index}.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: cardBg,
+                              child: const Icon(Icons.person, size: 20),
+                            ),
                           ),
                         ),
                       ),
