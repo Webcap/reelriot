@@ -60,7 +60,7 @@ jobs:
       - name: Clone reelriot_core Dependency
         run: |
           mkdir -p ../packages
-          git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Webcap/reelriot_core.git ../packages/reelriot_core
+          git clone --depth 1 https://github.com/Webcap/reelriot_core.git ../packages/reelriot_core
 
       - name: Clone media-kit Dependency Overrides
         run: |
@@ -123,7 +123,7 @@ jobs:
       - name: Clone reelriot_core Dependency
         run: |
           mkdir -p ../packages
-          git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Webcap/reelriot_core.git ../packages/reelriot_core
+          git clone --depth 1 https://github.com/Webcap/reelriot_core.git ../packages/reelriot_core
 
       - name: Clone media-kit Dependency Overrides
         run: |
