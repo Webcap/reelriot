@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:caffeine_core/caffeine_core.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:reelriot/provider/settings_provider.dart';
@@ -620,15 +622,22 @@ class DeleteAccountScreenState extends State<DeleteAccountScreen> {
             child: SizedBox(
               width: 48,
               height: 48,
-              child: Image.asset(
-                'assets/images/profiles/$avatarId.png',
+              child: CachedNetworkImage(
+                imageUrl: AvatarUtils.getAvatarUrl(avatarId),
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: _Design.primaryDim,
-                  child: const Icon(
-                    Icons.person_rounded,
-                    color: _Design.primary,
-                    size: 26,
+                memCacheWidth: 100,
+                memCacheHeight: 100,
+                placeholder: (_, __) => Container(color: _Design.primaryDim),
+                errorWidget: (_, __, ___) => Image.asset(
+                  'assets/images/profiles/$avatarId.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: _Design.primaryDim,
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: _Design.primary,
+                      size: 26,
+                    ),
                   ),
                 ),
               ),

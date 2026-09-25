@@ -1,4 +1,6 @@
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:caffeine_core/caffeine_core.dart';
 import 'package:reelriot/provider/bookmarks_provider.dart';
 import 'package:reelriot/provider/recently_watched_provider.dart';
 import 'package:reelriot/functions/functions.dart';
@@ -158,9 +160,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       height: 58,
                       width: 58,
                       color: Colors.black,
-                      child: Image.asset(
-                        'assets/images/profiles/${profile.index}.png',
+                      child: CachedNetworkImage(
+                        imageUrl: AvatarUtils.getAvatarUrl(profile.index),
                         fit: BoxFit.cover,
+                        memCacheWidth: 120,
+                        memCacheHeight: 120,
+                        errorWidget: (_, __, ___) => Image.asset(
+                          'assets/images/profiles/${profile.index}.png',
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),

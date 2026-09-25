@@ -85,7 +85,7 @@ class _MovieDetailOptionsState extends State<MovieDetailOptions> {
         releaseYear: releaseDate?.year,
         elapsed: 1,
         remaining: 0,
-        dateTime: DateTime.now().toIso8601String(),
+        dateTime: watchedAt ?? DateTime.now().toIso8601String(),
       ),
       watchedAt: watchedAt,
     );

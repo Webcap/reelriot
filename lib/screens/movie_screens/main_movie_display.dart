@@ -23,6 +23,7 @@ import 'package:reelriot/screens/movie_screens/widgets/scrolling_movie_list.dart
 import 'package:reelriot/screens/tv_screens/live_event_screen.dart';
 import 'package:reelriot/services/discovery_service.dart';
 import 'package:reelriot/utils/config.dart';
+import 'package:reelriot/utils/flavor_config.dart';
 import 'package:reelriot/utils/constant.dart';
 import 'package:reelriot/utils/globals.dart';
 import 'package:reelriot/utils/globlal_methods.dart';
@@ -120,6 +121,8 @@ class _MainMoviesDisplayState extends State<MainMoviesDisplay>
       userId: signIn.uid,
       mediaType: 'movie',
       region: settings.defaultCountry,
+      platform: 'android',
+      env: FlavorConfig.envName,
     );
 
     if (!mounted) return;

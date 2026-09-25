@@ -15,6 +15,7 @@ import 'package:reelriot/widgets/guest_profile_content.dart';
 import 'package:reelriot/widgets/sign_out_sheet.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:caffeine_core/caffeine_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -422,11 +423,21 @@ class _ProfilePageState extends State<ProfilePage> {
                     memCacheHeight: 160,
                     errorWidget: (_, __, ___) => const Icon(Icons.person, size: 40),
                   )
-                : Image.asset(
-                    'assets/images/profiles/$avatarId.png',
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
+                : CachedNetworkImage(
+                    imageUrl: AvatarUtils.getAvatarUrl(avatarId),
+                    imageBuilder: (_, imageProvider) => CircleAvatar(
+                      backgroundImage: imageProvider,
+                      radius: 40,
+                    ),
+                    memCacheWidth: 160,
+                    memCacheHeight: 160,
+                    errorWidget: (_, __, ___) => Image.asset(
+                      'assets/images/profiles/$avatarId.png',
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 40),
+                    ),
                   ),
           ),
           const SizedBox(width: 20),
@@ -554,11 +565,21 @@ class _ProfilePageState extends State<ProfilePage> {
                   memCacheHeight: 192,
                   errorWidget: (_, __, ___) => const Icon(Icons.person, size: 48),
                 )
-              : Image.asset(
-                  'assets/images/profiles/$avatarId.png',
-                  width: 96,
-                  height: 96,
-                  fit: BoxFit.cover,
+              : CachedNetworkImage(
+                  imageUrl: AvatarUtils.getAvatarUrl(avatarId),
+                  imageBuilder: (_, imageProvider) => CircleAvatar(
+                    backgroundImage: imageProvider,
+                    radius: 48,
+                  ),
+                  memCacheWidth: 192,
+                  memCacheHeight: 192,
+                  errorWidget: (_, __, ___) => Image.asset(
+                    'assets/images/profiles/$avatarId.png',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 48),
+                  ),
                 ),
         ),
         const SizedBox(height: 16),

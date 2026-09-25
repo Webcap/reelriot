@@ -26,4 +26,7 @@ class FlavorConfig {
 
   static bool get isDev => instance.flavor == Flavor.dev;
   static bool get isProd => instance.flavor == Flavor.prod;
+
+  /// Environment string expected by the Caffeine API feature flag evaluator.
+  static String get envName => isDev ? 'dev' : 'prod';
 }

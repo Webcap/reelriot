@@ -5,30 +5,63 @@ import 'package:http/http.dart' as http;
 import 'package:reelriot/models/recently_watched.dart';
 import 'package:reelriot/utils/constant.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Deletes any legacy local SQLite database files created by previous versions
+/// of the app to ensure watch history is purely cloud-backed and not stored on Android storage.
+Future<void> _cleanupLegacyDatabases() async {
+  try {
+    final directory = await getApplicationDocumentsDirectory();
+    final names = [
+      'recent_movies.db',
+      'recent_movies.db-journal',
+      'recent_movies.db-wal',
+      'recent_movies.db-shm',
+      'recent_episodes.db',
+      'recent_episodes.db-journal',
+      'recent_episodes.db-wal',
+      'recent_episodes.db-shm',
+      'recent_episodes_v2.db',
+      'recent_episodes_v2.db-journal',
+      'recent_episodes_v2.db-wal',
+      'recent_episodes_v2.db-shm',
+    ];
+    for (final name in names) {
+      final f1 = File('${directory.path}/$name');
+      if (await f1.exists()) {
+        await f1.delete();
+        debugPrint('[WatchHistory] 🗑️ Cleaned up legacy local database file: ${f1.path}');
+      }
+      final f2 = File('${directory.path}$name');
+      if (await f2.exists()) {
+        await f2.delete();
+        debugPrint('[WatchHistory] 🗑️ Cleaned up legacy local database file: ${f2.path}');
+      }
+    }
+  } catch (e) {
+    debugPrint('[WatchHistory] Legacy database cleanup note: $e');
+  }
+}
+
+/// Cloud-backed Movies Watch Controller (In-memory session state + Caffeine API / Supabase).
+/// Watch history is no longer stored in local SQLite databases on Android.
 class RecentlyWatchedMoviesController {
   static RecentlyWatchedMoviesController? _recentlyWatchedMoviesController;
-  Database? _database;
-  String tableName = 'recently_watched_movies_table';
-  String colId = 'id';
-  String colTitle = 'title';
-  String colReleaseYear = 'release_year';
-  String elapsedCol = 'elapsed';
-  String remainingCol = 'remaining';
-  String dateTimeCol = 'date_watched';
-  String posterPathCol = 'poster_path';
-  String backdropPathCol = 'backdrop_path';
-  String watchEventsTable = 'movie_watch_events';
-  String? get uid => _auth.currentUser?.id;
 
-  RecentlyWatchedMoviesController._createInstance();
+  final List<RecentMovie> _inMemoryMovies = [];
+  final Map<int, List<WatchEvent>> _inMemoryWatchEvents = {};
+
+  String? get uid => _auth.currentUser?.id;
+  GoTrueClient get _auth => Supabase.instance.client.auth;
 
   /// Timestamp of the last successful cloud write. Used to debounce the API
   /// so progress saves during active playback don't hammer the server
   /// (periodic saves happen every 10 s). Completion writes always bypass this.
   DateTime? _lastCloudSync;
+
+  RecentlyWatchedMoviesController._createInstance() {
+    _cleanupLegacyDatabases();
+  }
 
   factory RecentlyWatchedMoviesController() {
     _recentlyWatchedMoviesController ??=
@@ -36,70 +69,37 @@ class RecentlyWatchedMoviesController {
     return _recentlyWatchedMoviesController!;
   }
 
-  Future<Database> initializeDatabase() async {
-    Directory directory = await getApplicationDocumentsDirectory();
-    String properPath = '${directory.path}/recent_movies.db';
-    String legacyPath = '${directory.path}recent_movies.db';
-    if (!await File(properPath).exists() && await File(legacyPath).exists()) {
-      try {
-        await File(legacyPath).copy(properPath);
-      } catch (_) {}
-    }
-    var recentMoviesDatabase = await openDatabase(properPath,
-        version: 2, onCreate: _createDb, onUpgrade: _onUpgrade);
-    return recentMoviesDatabase;
-  }
-
-  Future<Database> get database async {
-    _database ??= await initializeDatabase();
-    return _database!;
-  }
-
-  void _createDb(Database db, int newVersion) async {
-    await db.execute(
-        'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $posterPathCol TEXT, $backdropPathCol TEXT, $colReleaseYear INTEGER, $elapsedCol NUMERIC, $remainingCol NUMERIC, $dateTimeCol TEXT)');
-    await _createWatchEventsTable(db);
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await _createWatchEventsTable(db);
-    }
-  }
-
-  Future<void> _createWatchEventsTable(Database db) async {
-    await db.execute(
-        'CREATE TABLE IF NOT EXISTS $watchEventsTable(event_id TEXT PRIMARY KEY, movie_id INTEGER NOT NULL, watched_at TEXT NOT NULL, synced INTEGER NOT NULL DEFAULT 0)');
-  }
-
-  Future<List<Map<String, dynamic>>> getMovieMapList() async {
-    Database db = await database;
-    var result = await db.query(tableName, orderBy: '$dateTimeCol DESC');
-    return result;
+  Future<List<RecentMovie>> getRecentMovieList() async {
+    return List<RecentMovie>.from(_inMemoryMovies);
   }
 
   Future<int> insertMovie(RecentMovie rMovie) async {
-    Database db = await database;
-    var result = await db.insert(tableName, rMovie.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final idx = _inMemoryMovies.indexWhere((m) => m.id == rMovie.id);
+    if (idx != -1) {
+      _inMemoryMovies[idx] = rMovie;
+    } else {
+      _inMemoryMovies.insert(0, rMovie);
+    }
     await addWatchedMovietoFirebase(rMovie);
-    return result;
+    return 1;
   }
 
   Future<int> updateMovie(RecentMovie rMovie, int id) async {
-    var db = await database;
-    var result =
-        await db.update(tableName, rMovie.toMap(), where: '$colId = $id');
+    final idx = _inMemoryMovies.indexWhere((m) => m.id == id);
+    if (idx != -1) {
+      _inMemoryMovies[idx] = rMovie;
+    } else {
+      _inMemoryMovies.insert(0, rMovie);
+    }
     await addWatchedMovietoFirebase(rMovie);
-    return result;
+    return 1;
   }
 
   Future<int> deleteMovie(int id) async {
-    var db = await database;
-    int result =
-        await db.rawDelete('DELETE FROM $tableName WHERE $colId = $id');
+    _inMemoryMovies.removeWhere((m) => m.id == id);
+    _inMemoryWatchEvents.remove(id);
     await removeMovieFromCloud(id);
-    return result;
+    return 1;
   }
 
   Future<void> removeMovieFromCloud(int movieId) async {
@@ -126,34 +126,12 @@ class RecentlyWatchedMoviesController {
   }
 
   Future<int> getCount() async {
-    Database db = await database;
-    List<Map<String, dynamic>> x =
-        await db.rawQuery('SELECT COUNT (*) from $tableName');
-    int result = Sqflite.firstIntValue(x)!;
-    return result;
-  }
-
-  Future<List<RecentMovie>> getRecentMovieList() async {
-    var movieMapList = await getMovieMapList();
-    int count = movieMapList.length;
-    List<RecentMovie> movieList = [];
-
-    for (int i = 0; i < count; i++) {
-      movieList.add(RecentMovie.fromMapObject(movieMapList[i]));
-    }
-    return movieList;
+    return _inMemoryMovies.length;
   }
 
   Future<bool> contain(int id) async {
-    Database db = await database;
-    List<Map<String, dynamic>> x = await db
-        .rawQuery('SELECT COUNT (*) from $tableName WHERE $colId = $id');
-    int result = Sqflite.firstIntValue(x)!;
-    if (result == 0) return false;
-    return true;
+    return _inMemoryMovies.any((m) => m.id == id);
   }
-
-  GoTrueClient get _auth => Supabase.instance.client.auth;
 
   /// Upserts movie by id (replaces existing, no duplicates) via Caffeine API.
   Future<void> addWatchedMovietoFirebase(RecentMovie rMovie) async {
@@ -189,6 +167,7 @@ class RecentlyWatchedMoviesController {
         'duration_ms': total,
         'completed': isFinished,
         'started_at': rMovie.startedAt ?? rMovie.dateTime,
+        'completed_at': isFinished ? (rMovie.dateTime ?? now.toIso8601String()) : null,
         'platform': Platform.isAndroid ? 'mobile_android' : (Platform.isIOS ? 'mobile_ios' : 'mobile'),
       };
 
@@ -207,65 +186,45 @@ class RecentlyWatchedMoviesController {
     }
   }
 
-  Future<void> setWatchHistoryCollection() async {
-    // No-op: uid dynamically retrieves _auth.currentUser?.id
-  }
+  Future<void> setWatchHistoryCollection() async {}
 
   Future<bool> checkIfDocExists(String docId) async {
-    return true; // Deprecated single blob validation
+    return true;
   }
 
   /// Inserts a new watch event (a "play") for [movieId] and fires the cloud sync.
-  /// Unlike [insertMovie], this never replaces an existing row — every call adds a
-  /// new event, powering rewatch counts.
   Future<void> insertWatchEvent(WatchEvent event, {
     required String? title,
     String? posterPath,
     String? backdropPath,
   }) async {
-    final db = await database;
-    await db.insert(watchEventsTable, event.toMap()..['movie_id'] = event.mediaId,
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final list = _inMemoryWatchEvents.putIfAbsent(event.mediaId, () => []);
+    list.removeWhere((e) => e.eventId == event.eventId);
+    list.insert(0, event);
     await addWatchEventToCloud(event,
         title: title, posterPath: posterPath, backdropPath: backdropPath);
   }
 
   Future<List<WatchEvent>> getWatchEvents(int movieId) async {
-    final db = await database;
-    final rows = await db.query(watchEventsTable,
-        where: 'movie_id = ?', whereArgs: [movieId], orderBy: 'watched_at DESC');
-    return rows
-        .map((m) => WatchEvent.fromMapObject(m, idColumn: 'movie_id'))
-        .toList();
+    return List<WatchEvent>.from(_inMemoryWatchEvents[movieId] ?? []);
   }
 
   Future<int> getWatchCount(int movieId) async {
-    final db = await database;
-    final x = await db.rawQuery(
-        'SELECT COUNT (*) from $watchEventsTable WHERE movie_id = ?', [movieId]);
-    return Sqflite.firstIntValue(x) ?? 0;
+    return _inMemoryWatchEvents[movieId]?.length ?? 0;
   }
 
   Future<void> deleteWatchEvent(String eventId) async {
-    final db = await database;
-    await db.delete(watchEventsTable, where: 'event_id = ?', whereArgs: [eventId]);
+    for (final list in _inMemoryWatchEvents.values) {
+      list.removeWhere((e) => e.eventId == eventId);
+    }
     await removeWatchEventFromCloud(eventId);
   }
 
   Future<void> deleteAllWatchEvents(int movieId) async {
-    final db = await database;
-    await db.delete(watchEventsTable, where: 'movie_id = ?', whereArgs: [movieId]);
+    _inMemoryWatchEvents.remove(movieId);
   }
 
-  /// Creates a new watch event on the Caffeine API. Unlike [addWatchedMovietoFirebase]
-  /// (which upserts the progress row), this always creates a new history entry.
-  ///
-  /// Contract (to be implemented server-side):
-  ///   POST /v1/user/{uid}/history/watches
-  ///   body: {event_id, media_type: 'movie', media_id, title, poster_path?,
-  ///          backdrop_path?, watched_at, platform}
-  ///   -> {success, watch_id, watch_count}
-  /// The server should dedupe on event_id so retried requests don't double-count.
+  /// Creates a new watch event on the Caffeine API.
   Future<void> addWatchEventToCloud(WatchEvent event, {
     required String? title,
     String? posterPath,
@@ -282,8 +241,6 @@ class RecentlyWatchedMoviesController {
         'title': title,
         'poster_path': posterPath,
         'backdrop_path': backdropPath,
-        // Empty string means the user picked "Unknown date" — send null so the
-        // server can distinguish "no date" from an actual timestamp.
         'watched_at': event.watchedAt.isEmpty ? null : event.watchedAt,
         'platform': Platform.isAndroid
             ? 'mobile_android'
@@ -304,7 +261,7 @@ class RecentlyWatchedMoviesController {
     }
   }
 
-  /// Contract: DELETE /v1/user/{uid}/history/watches/{eventId} -> {success, watch_count}
+  /// Deletes a watch event on the Caffeine API.
   Future<void> removeWatchEventFromCloud(String eventId) async {
     if (uid == null) return;
     try {
@@ -319,125 +276,79 @@ class RecentlyWatchedMoviesController {
   }
 
   Future<void> clearAllMovies() async {
-    final db = await database;
-    await db.delete(tableName);
-    await db.delete(watchEventsTable);
+    _inMemoryMovies.clear();
+    _inMemoryWatchEvents.clear();
+    await _cleanupLegacyDatabases();
   }
 
   Future<void> replaceAllMovies(List<RecentMovie> movies) async {
-    final db = await database;
-    await db.delete(tableName);
-    for (final m in movies) {
-      await db.insert(
-        tableName,
-        m.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
+    _inMemoryMovies
+      ..clear()
+      ..addAll(movies);
   }
 }
 
+/// Cloud-backed TV Episode Watch Controller (In-memory session state + Caffeine API / Supabase).
+/// Watch history is no longer stored in local SQLite databases on Android.
 class RecentlyWatchedEpisodeController {
   static RecentlyWatchedEpisodeController? _recentlyWatchedEpisodeController;
-  static Database? _database;
-  String tableName = 'recently_watched_tv_shows_table';
-  String colId = 'id';
-  String colBackdropPath = 'backdrop_path';
-  String colTitle = 'series_name';
-  String colEpisodeTitle = 'episode_name';
-  String colEpisodeNum = 'episode_num';
-  String colSeasonNum = 'season_num';
-  String colPosterPath = 'poster_path';
-  String colElapsed = 'elapsed';
-  String colRemaining = 'remaining';
-  String colDateAdded = 'date_added';
-  String colSeriesId = 'series_id';
-  String watchEventsTable = 'episode_watch_events';
-  RecentlyWatchedEpisodeController._createInstance();
-  String? get uid => _auth.currentUser?.id;
 
+  final List<RecentEpisode> _inMemoryEpisodes = [];
+  final Map<String, List<WatchEvent>> _inMemoryWatchEvents = {};
+
+  String? get uid => _auth.currentUser?.id;
   GoTrueClient get _auth => Supabase.instance.client.auth;
 
   /// Timestamp of the last successful cloud write. Used to debounce the API
-  /// so progress saves during active playback don’t hammer the server
+  /// so progress saves during active playback don't hammer the server
   /// (periodic saves happen every 10 s). Completion writes always bypass this.
   DateTime? _lastCloudSync;
+
+  RecentlyWatchedEpisodeController._createInstance() {
+    _cleanupLegacyDatabases();
+  }
 
   factory RecentlyWatchedEpisodeController() {
     _recentlyWatchedEpisodeController ??=
         RecentlyWatchedEpisodeController._createInstance();
     return _recentlyWatchedEpisodeController!;
   }
-  Future<Database> initializeDatabase() async {
-    Directory directory = await getApplicationDocumentsDirectory();
-    String properPath = '${directory.path}/recent_episodes_v2.db';
-    String legacyPath = '${directory.path}recent_episodes_v2.db';
-    if (!await File(properPath).exists() && await File(legacyPath).exists()) {
-      try {
-        await File(legacyPath).copy(properPath);
-      } catch (_) {}
-    }
-    var episodesDatabase = await openDatabase(properPath,
-        version: 2, onCreate: _createDb, onUpgrade: _onUpgrade);
-    return episodesDatabase;
+
+  Future<List<RecentEpisode>> getEpisodeList() async {
+    return List<RecentEpisode>.from(_inMemoryEpisodes);
   }
 
-  Future<Database> get database async {
-    _database ??= await initializeDatabase();
-    return _database!;
-  }
-
-  void _createDb(Database db, int newVersion) async {
-    await db.execute(
-        'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colSeriesId INTEGER, $colTitle TEXT, $colEpisodeTitle TEXT, $colEpisodeNum INTEGER, $colSeasonNum INTEGER, $colElapsed NUMERIC, $colRemaining NUMERIC, $colPosterPath TEXT, $colDateAdded TEXT)');
-    await _createWatchEventsTable(db);
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await _createWatchEventsTable(db);
-    }
-  }
-
-  Future<void> _createWatchEventsTable(Database db) async {
-    await db.execute(
-        'CREATE TABLE IF NOT EXISTS $watchEventsTable(event_id TEXT PRIMARY KEY, series_id INTEGER, episode_id INTEGER, season_num INTEGER, episode_num INTEGER, watched_at TEXT NOT NULL, synced INTEGER NOT NULL DEFAULT 0)');
-  }
-
-  //this function will return all the tv in the database.
-  Future<List<Map<String, dynamic>>> getTVMapList() async {
-    Database db = await database;
-    var result = await db.query(tableName, orderBy: '$colDateAdded DESC');
-    return result;
-  }
-
-  // this method will be used to insert tv in the database.
   Future<int> insertTV(RecentEpisode rEpisode) async {
-    Database db = await database;
-    var result = await db.insert(tableName, rEpisode.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final idx = _inMemoryEpisodes.indexWhere((e) =>
+        (e.seriesId ?? e.id) == (rEpisode.seriesId ?? rEpisode.id) &&
+        e.seasonNum == rEpisode.seasonNum &&
+        e.episodeNum == rEpisode.episodeNum);
+    if (idx != -1) {
+      _inMemoryEpisodes[idx] = rEpisode;
+    } else {
+      _inMemoryEpisodes.insert(0, rEpisode);
+    }
     await addWatchedTVtoFirebase(rEpisode);
-    return result;
+    return 1;
   }
 
-  // this method will update a tv
   Future<int> updateTV(
       RecentEpisode rEpisode, int id, int episodeNum, int seasonNum) async {
-    var db = await database;
-    var result = await db.update(tableName, rEpisode.toMap(),
-        where:
-            '$colId = $id AND $colEpisodeNum = $episodeNum AND $colSeasonNum = $seasonNum');
-    await addWatchedTVtoFirebase(rEpisode);
-    return result;
+    return insertTV(rEpisode);
   }
 
-  // this method will delete a tv
   Future<int> deleteTV(int id, int episodeNum, int seasonNum) async {
-    var db = await database;
-    int result = await db.rawDelete(
-        'DELETE FROM $tableName WHERE $colId = $id AND $colEpisodeNum = $episodeNum AND $colSeasonNum = $seasonNum');
+    _inMemoryEpisodes.removeWhere((e) {
+      final sId = e.seriesId ?? e.id;
+      if (sId != id) return false;
+      if (e.seasonNum != seasonNum) return false;
+      if (e.episodeNum != episodeNum) return false;
+      return true;
+    });
+    final key = '${id}_${seasonNum}_$episodeNum';
+    _inMemoryWatchEvents.remove(key);
     await removeEpisodeFromCloud(id, episodeNum, seasonNum);
-    return result;
+    return 1;
   }
 
   Future<void> removeEpisodeFromCloud(
@@ -466,35 +377,12 @@ class RecentlyWatchedEpisodeController {
     }
   }
 
-  // Get number of TV objects in database
   Future<int> getCount() async {
-    Database db = await database;
-    List<Map<String, dynamic>> x =
-        await db.rawQuery('SELECT COUNT (*) from $tableName');
-    int result = Sqflite.firstIntValue(x)!;
-    return result;
+    return _inMemoryEpisodes.length;
   }
 
-  // Get the 'Map List' [ List<Map> ] and convert it to 'TV List' [ List<Movie> ]
-  Future<List<RecentEpisode>> getEpisodeList() async {
-    var tvMapList = await getTVMapList(); // Get 'Map List' from database
-    int count = tvMapList.length; // Count the number of map entries in db table
-    List<RecentEpisode> tvList = <RecentEpisode>[];
-    // For loop to create a 'TV List' from a 'Map List'
-    for (int i = 0; i < count; i++) {
-      tvList.add(RecentEpisode.fromMapObject(tvMapList[i]));
-    }
-    return tvList;
-  }
-
-  // this function will check if a movies exists in the database.
   Future<bool> contain(int id) async {
-    Database db = await database;
-    List<Map<String, dynamic>> x = await db
-        .rawQuery('SELECT COUNT (*) from $tableName WHERE $colId = $id');
-    int result = Sqflite.firstIntValue(x)!;
-    if (result == 0) return false;
-    return true;
+    return _inMemoryEpisodes.any((e) => (e.seriesId ?? e.id) == id);
   }
 
   /// Upserts episode by id (replaces existing, no duplicates) via Caffeine API.
@@ -508,7 +396,6 @@ class RecentlyWatchedEpisodeController {
           remaining == 0 && elapsed > 0 || (total > 0 && (elapsed / total) >= 0.9);
 
       // Debounce: skip non-completion syncs that happened within the last 15 s.
-      // This prevents hammering the API every 10 s during active playback.
       final now = DateTime.now();
       if (!isFinished &&
           _lastCloudSync != null &&
@@ -534,6 +421,7 @@ class RecentlyWatchedEpisodeController {
         'duration_ms': total,
         'completed': isFinished,
         'started_at': rEpisode.startedAt ?? rEpisode.dateTime,
+        'completed_at': isFinished ? (rEpisode.dateTime ?? now.toIso8601String()) : null,
         'platform': Platform.isAndroid ? 'mobile_android' : (Platform.isIOS ? 'mobile_ios' : 'mobile'),
       };
 
@@ -553,16 +441,12 @@ class RecentlyWatchedEpisodeController {
   }
 
   Future<bool> checkIfDocExists(String docId) async {
-    return true; // Deprecated
+    return true;
   }
 
-  Future<void> setWatchHistoryCollection() async {
-    // No-op: uid dynamically retrieves _auth.currentUser?.id
-  }
+  Future<void> setWatchHistoryCollection() async {}
 
-  /// Inserts a new watch event (a "play") for the given series/season/episode and
-  /// fires the cloud sync. Unlike [insertTV], this never replaces an existing row —
-  /// every call adds a new event, powering rewatch counts.
+  /// Inserts a new watch event (a "play") for the given series/season/episode.
   Future<void> insertWatchEvent(WatchEvent event, {
     required int? seriesId,
     required int? episodeId,
@@ -570,12 +454,11 @@ class RecentlyWatchedEpisodeController {
     String? episodeName,
     String? posterPath,
   }) async {
-    final db = await database;
-    final map = event.toMap()
-      ..['series_id'] = seriesId
-      ..['episode_id'] = episodeId;
-    await db.insert(watchEventsTable, map,
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final sId = seriesId ?? event.mediaId;
+    final key = '${sId}_${event.seasonNum}_${event.episodeNum}';
+    final list = _inMemoryWatchEvents.putIfAbsent(key, () => []);
+    list.removeWhere((e) => e.eventId == event.eventId);
+    list.insert(0, event);
     await addWatchEventToCloud(event,
         seriesId: seriesId,
         seriesName: seriesName,
@@ -585,47 +468,29 @@ class RecentlyWatchedEpisodeController {
 
   Future<List<WatchEvent>> getWatchEvents(
       int seriesId, int seasonNum, int episodeNum) async {
-    final db = await database;
-    final rows = await db.query(watchEventsTable,
-        where: 'series_id = ? AND season_num = ? AND episode_num = ?',
-        whereArgs: [seriesId, seasonNum, episodeNum],
-        orderBy: 'watched_at DESC');
-    return rows
-        .map((m) => WatchEvent.fromMapObject(m, idColumn: 'series_id'))
-        .toList();
+    final key = '${seriesId}_${seasonNum}_$episodeNum';
+    return List<WatchEvent>.from(_inMemoryWatchEvents[key] ?? []);
   }
 
   Future<int> getWatchCount(int seriesId, int seasonNum, int episodeNum) async {
-    final db = await database;
-    final x = await db.rawQuery(
-        'SELECT COUNT (*) from $watchEventsTable WHERE series_id = ? AND season_num = ? AND episode_num = ?',
-        [seriesId, seasonNum, episodeNum]);
-    return Sqflite.firstIntValue(x) ?? 0;
+    final key = '${seriesId}_${seasonNum}_$episodeNum';
+    return _inMemoryWatchEvents[key]?.length ?? 0;
   }
 
   Future<void> deleteWatchEvent(String eventId) async {
-    final db = await database;
-    await db.delete(watchEventsTable, where: 'event_id = ?', whereArgs: [eventId]);
+    for (final list in _inMemoryWatchEvents.values) {
+      list.removeWhere((e) => e.eventId == eventId);
+    }
     await removeWatchEventFromCloud(eventId);
   }
 
   Future<void> deleteAllWatchEvents(
       int seriesId, int seasonNum, int episodeNum) async {
-    final db = await database;
-    await db.delete(watchEventsTable,
-        where: 'series_id = ? AND season_num = ? AND episode_num = ?',
-        whereArgs: [seriesId, seasonNum, episodeNum]);
+    final key = '${seriesId}_${seasonNum}_$episodeNum';
+    _inMemoryWatchEvents.remove(key);
   }
 
-  /// Creates a new watch event on the Caffeine API. Unlike [addWatchedTVtoFirebase]
-  /// (which upserts the progress row), this always creates a new history entry.
-  ///
-  /// Contract (to be implemented server-side):
-  ///   POST /v1/user/{uid}/history/watches
-  ///   body: {event_id, media_type: 'tv', media_id, season_num, episode_num, title,
-  ///          episode_name?, poster_path?, watched_at, platform}
-  ///   -> {success, watch_id, watch_count}
-  /// The server should dedupe on event_id so retried requests don't double-count.
+  /// Creates a new watch event on the Caffeine API.
   Future<void> addWatchEventToCloud(WatchEvent event, {
     required int? seriesId,
     required String? seriesName,
@@ -645,8 +510,6 @@ class RecentlyWatchedEpisodeController {
         'title': seriesName,
         'episode_name': episodeName,
         'poster_path': posterPath,
-        // Empty string means the user picked "Unknown date" — send null so the
-        // server can distinguish "no date" from an actual timestamp.
         'watched_at': event.watchedAt.isEmpty ? null : event.watchedAt,
         'platform': Platform.isAndroid
             ? 'mobile_android'
@@ -667,7 +530,7 @@ class RecentlyWatchedEpisodeController {
     }
   }
 
-  /// Contract: DELETE /v1/user/{uid}/history/watches/{eventId} -> {success, watch_count}
+  /// Deletes a watch event on the Caffeine API.
   Future<void> removeWatchEventFromCloud(String eventId) async {
     if (uid == null) return;
     try {
@@ -682,20 +545,14 @@ class RecentlyWatchedEpisodeController {
   }
 
   Future<void> clearAllEpisodes() async {
-    final db = await database;
-    await db.delete(tableName);
-    await db.delete(watchEventsTable);
+    _inMemoryEpisodes.clear();
+    _inMemoryWatchEvents.clear();
+    await _cleanupLegacyDatabases();
   }
 
   Future<void> replaceAllEpisodes(List<RecentEpisode> episodes) async {
-    final db = await database;
-    await db.delete(tableName);
-    for (final e in episodes) {
-      await db.insert(
-        tableName,
-        e.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
+    _inMemoryEpisodes
+      ..clear()
+      ..addAll(episodes);
   }
 }
