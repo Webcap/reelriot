@@ -18,6 +18,7 @@ import 'package:reelriot/widgets/banner_ad_widget.dart';
 import 'package:reelriot/widgets/featured_match_card.dart';
 import 'package:reelriot/screens/common/update_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:reelriot/utils/flavor_config.dart';
 
 class MainTVDisplay extends StatefulWidget {
   const MainTVDisplay({
@@ -51,6 +52,8 @@ class _MainTVDisplayState extends State<MainTVDisplay> {
       userId: signIn.uid,
       mediaType: 'tv',
       region: settings.defaultCountry,
+      platform: 'android',
+      env: FlavorConfig.envName,
     );
 
     if (!mounted) return;

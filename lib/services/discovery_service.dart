@@ -18,18 +18,22 @@ class DiscoveryService {
   DiscoveryService._();
   static final DiscoveryService instance = DiscoveryService._();
 
-  static const _timeout = Duration(seconds: 10);
+  static const _timeout = Duration(seconds: 15);
 
   /// Fetches the full home-screen discovery feed.
   ///
   /// [caffeineBaseUrl] — value from `AppDependencyProvider.caffeineAPIURL`
   /// [userId]         — optional; pass the signed-in user's UID for AI rows
   /// [region]         — optional; ISO-3166-1 alpha-2 (e.g. 'US')
+  /// [platform]       — optional; client platform (e.g. 'android')
+  /// [env]            — optional; environment (e.g. 'dev', 'prod')
   Future<DiscoveryFeed?> fetchHomeFeed({
     required String caffeineBaseUrl,
     String? userId,
     String? mediaType,
     String? region,
+    String? platform,
+    String? env,
   }) async {
     if (caffeineBaseUrl.trim().isEmpty) return null;
 
@@ -38,6 +42,8 @@ class DiscoveryService {
       userId: userId,
       mediaType: mediaType,
       region: region,
+      platform: platform,
+      env: env,
     );
 
     try {

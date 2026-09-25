@@ -429,12 +429,16 @@ class Endpoints {
     String? userId,
     String? mediaType,
     String? region,
+    String? platform,
+    String? env,
   }) {
     final b = _b(baseUrl);
     final params = <String>[];
     if (userId != null && userId.isNotEmpty) params.add('userId=$userId');
     if (mediaType != null && mediaType.isNotEmpty) params.add('mediaType=$mediaType');
     if (region != null && region.isNotEmpty) params.add('region=$region');
+    if (platform != null && platform.isNotEmpty) params.add('platform=$platform');
+    if (env != null && env.isNotEmpty) params.add('env=$env');
     final query = params.isEmpty ? '' : '?${params.join('&')}';
     return '${b}v1/discovery$query';
   }

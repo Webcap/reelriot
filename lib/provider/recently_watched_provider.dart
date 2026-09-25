@@ -161,11 +161,6 @@ class RecentProvider extends ChangeNotifier {
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (uid == null) return;
 
-    final lastSyncedUid = sharedPrefsSingleton.getString('last_synced_user_id');
-    final bool isUserSwitch = lastSyncedUid != null && lastSyncedUid != uid;
-    final bool replaceWithoutMerge =
-        forceReplace || isUserSwitch || (lastSyncedUid == null);
-
     try {
       final base = caffeineApiUrl.replaceAll(RegExp(r'/+$'), '');
       final url = Uri.parse('$base/v1/user/$uid/history?limit=100');
@@ -221,20 +216,11 @@ class RecentProvider extends ChangeNotifier {
             }
           }
 
-          if (replaceWithoutMerge) {
-            // Replace local DB completely to prevent another user's local history from merging into this account
-            await _movieController.replaceAllMovies(cloudMovies);
-            await _episodeController.replaceAllEpisodes(cloudEpisodes);
-          } else {
-            final localMovies = await _movieController.getRecentMovieList();
-            final localEpisodes = await _episodeController.getEpisodeList();
-
-            final mergedMovies = _mergeMovies(cloudMovies, localMovies);
-            final mergedEpisodes = _mergeEpisodes(cloudEpisodes, localEpisodes);
-
-            await _movieController.replaceAllMovies(mergedMovies);
-            await _episodeController.replaceAllEpisodes(mergedEpisodes);
-          }
+          // Cloud is the single source of truth for watch history; directly update in-memory controllers.
+          _movies = cloudMovies;
+          _episodes = cloudEpisodes;
+          await _movieController.replaceAllMovies(cloudMovies);
+          await _episodeController.replaceAllEpisodes(cloudEpisodes);
 
           await sharedPrefsSingleton.setString('last_synced_user_id', uid);
         }
@@ -250,81 +236,6 @@ class RecentProvider extends ChangeNotifier {
     // progress updates are reflected instantly without a full app restart.
     _subscribeRealtime(uid);
   }
-
-  List<RecentMovie> _mergeMovies(
-      List<RecentMovie> cloud, List<RecentMovie> local) {
-    final byId = <int, RecentMovie>{};
-    for (final m in local) {
-      if (m.id != null) byId[m.id!] = m;
-    }
-    for (final m in cloud) {
-      if (m.id == null) continue;
-      final existing = byId[m.id!];
-      if (existing != null) {
-        bool mComp = m.remaining == 0;
-        bool exComp = existing.remaining == 0;
-        if (mComp && !exComp) {
-          byId[m.id!] = m;
-        } else if (!mComp && exComp) {
-          // Keep local
-        } else if ((m.elapsed ?? 0) > (existing.elapsed ?? 0)) {
-          byId[m.id!] = m;
-        }
-      } else {
-        byId[m.id!] = m;
-      }
-    }
-    final list = byId.values.toList();
-    list.sort((a, b) {
-      final da = a.dateTime ?? '';
-      final db = b.dateTime ?? '';
-      return db.compareTo(da);
-    });
-    return list;
-  }
-
-  List<RecentEpisode> _mergeEpisodes(
-      List<RecentEpisode> cloud, List<RecentEpisode> local) {
-    String key(RecentEpisode e) =>
-        '${e.seriesId ?? e.id}_${e.seasonNum}_${e.episodeNum}';
-    final byKey = <String, RecentEpisode>{};
-    for (final e in local) {
-      if ((e.id == null && e.seriesId == null) ||
-          e.seasonNum == null ||
-          e.episodeNum == null) {
-        continue;
-      }
-      byKey[key(e)] = e;
-    }
-    for (final e in cloud) {
-      if (e.id == null || e.seasonNum == null || e.episodeNum == null) {
-        continue;
-      }
-      final k = key(e);
-      final existing = byKey[k];
-      if (existing != null) {
-        bool eComp = e.remaining == 0;
-        bool exComp = existing.remaining == 0;
-        if (eComp && !exComp) {
-          byKey[k] = e;
-        } else if (!eComp && exComp) {
-          // Keep local
-        } else if ((e.elapsed ?? 0) > (existing.elapsed ?? 0)) {
-          byKey[k] = e;
-        }
-      } else {
-        byKey[k] = e;
-      }
-    }
-    final list = byKey.values.toList();
-    list.sort((a, b) {
-      final da = a.dateTime ?? '';
-      final db = b.dateTime ?? '';
-      return db.compareTo(da);
-    });
-    return list;
-  }
-
 
   Future<void> fetchMovies() async {
     _movies = await _movieController.getRecentMovieList();
@@ -790,13 +701,6 @@ class RecentProvider extends ChangeNotifier {
     }
   }
 
-  static bool _isWithinLast2Weeks(String? dateTimeStr) {
-    if (dateTimeStr == null || dateTimeStr.isEmpty) return false;
-    final dt = DateTime.tryParse(dateTimeStr);
-    if (dt == null) return false;
-    return DateTime.now().difference(dt).inDays <= 14;
-  }
-
   static int _ensureMs(int? value) {
     if (value == null) return 0;
     if (value > 0 && value < 50000) {
@@ -817,45 +721,9 @@ class RecentProvider extends ChangeNotifier {
     }
   }
 
-  /// Watch time (minutes) in last 2 weeks for movies.
-  int get movieWatchTimeMinutesLast2Weeks {
-    int localTotalMs = 0;
-    for (final m in _movies) {
-      if (!_isWithinLast2Weeks(m.dateTime)) continue;
-      // Count completed movies
-      if (m.remaining == 0 || (m.elapsed != null && m.elapsed! > 0 && (m.remaining == null || m.remaining == 0))) {
-        int ms = _ensureMs(m.elapsed);
-        if (ms <= 0) ms = 7200000; // 2h fallback
-        localTotalMs += ms;
-      }
-    }
-    final int localMins = localTotalMs ~/ 60000;
-    if (_apiMovieWatchTimeMinutes != null && _apiMovieWatchTimeMinutes! > 0) {
-      return _apiMovieWatchTimeMinutes! > localMins
-          ? _apiMovieWatchTimeMinutes!
-          : localMins;
-    }
-    return localMins;
-  }
+  /// Watch time (minutes) in last 2 weeks for movies, directly from cloud stats API.
+  int get movieWatchTimeMinutesLast2Weeks => _apiMovieWatchTimeMinutes ?? 0;
 
-  /// Watch time (minutes) in last 2 weeks for TV episodes.
-  int get tvWatchTimeMinutesLast2Weeks {
-    int localTotalMs = 0;
-    for (final e in _episodes) {
-      if (!_isWithinLast2Weeks(e.dateTime)) continue;
-      // Count completed episodes
-      if (e.remaining == 0 || (e.elapsed != null && e.elapsed! > 0 && (e.remaining == null || e.remaining == 0))) {
-        int ms = _ensureMs(e.elapsed);
-        if (ms <= 0) ms = 2700000; // 45m fallback
-        localTotalMs += ms;
-      }
-    }
-    final int localMins = localTotalMs ~/ 60000;
-    if (_apiTvWatchTimeMinutes != null && _apiTvWatchTimeMinutes! > 0) {
-      return _apiTvWatchTimeMinutes! > localMins
-          ? _apiTvWatchTimeMinutes!
-          : localMins;
-    }
-    return localMins;
-  }
+  /// Watch time (minutes) in last 2 weeks for TV episodes, directly from cloud stats API.
+  int get tvWatchTimeMinutesLast2Weeks => _apiTvWatchTimeMinutes ?? 0;
 }
